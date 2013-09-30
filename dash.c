@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 #define MAX_CMD_LEN 100
 
@@ -14,6 +15,21 @@ int parseUserInput(char *userInputStr, char **storeArgs)
     for (i = 1;
         storeArgs[i] = strtok(NULL, " \n"), storeArgs[i] != NULL;
         i++) {}
+}
+
+int printErrorMessage(char** args, int code)
+{
+    switch(code) {
+        case EACCES:
+            printf("Permission DENIED: %s\n", args[0]);
+            break;
+        case ENOENT:
+            printf("Command not found: %s\n", args[0]);
+            break;
+        default:
+            printf("Something bad happened. Error code %d\n", code);
+            printf("You tried to run: %s\n", args[0]);
+    }
 }
 
 int main(int argc, char* argv[])
@@ -43,7 +59,7 @@ int main(int argc, char* argv[])
             rc = execvp(try[0], try);
             if(rc < 0)
             {
-                printf("Failed in child process!\n");
+                printErrorMessage(try, errno);
                 exit(1);
             }
         }
