@@ -1,11 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
 
-int parseUserInput(char *userInputStr, char **storeArgs[])
+#define MAX_CMD_LEN 100
+
+int parseUserInput(char *userInputStr, char **storeArgs)
 {
-    char *try[] = {"ls", "-l", "-a"};
-    *storeArgs = try;
+    // char *try[] = {"ls", "-l", "-a"};
+    storeArgs[0] = strtok(userInputStr, " \n");
+    int i;
+    for (i = 1;
+        storeArgs[i] = strtok(NULL, " \n"), storeArgs[i] != NULL;
+        i++) {}
 }
 
 int main(int argc, char* argv[])
@@ -15,24 +23,24 @@ int main(int argc, char* argv[])
     int status = 0;
     char *userinput = NULL;
     //char *const try[] = {"ls", "-l", "-a"};
-    char **try;
+    char **try = (char**) malloc(sizeof(char*) * 10);
 
-    while(!userinput || (strcmp("quit", userinput) != 0))
+    while(1)
     {
-        userinput = malloc(sizeof(char)*100);
+        userinput = malloc(sizeof(char)*MAX_CMD_LEN);
         printf("_dash > ");
-        scanf("%s", userinput);
+        fgets(userinput, MAX_CMD_LEN, stdin);
+        if (strcmp("quit\n", userinput) == 0) {
+          break;
+        }
 
-        parseUserInput(userinput, &try);
-        printf("try 0: %s\n", try[0]);
-        printf("try 1: %s\n", try[1]);
-        printf("try 2: %s\n", try[2]);
+        parseUserInput(userinput, try);
         pid = fork();
 
         if(pid == 0) // Child
         {
-            printf("I'm the child!\n");
-            rc = execvp("ls", try);
+            // printf("I'm the child!\n");
+            rc = execvp(try[0], try);
             if(rc < 0)
             {
                 printf("Failed in child process!\n");
@@ -46,7 +54,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            printf("I'm the parent!\n");
+            // printf("I'm the parent!\n");
         }
         waitpid(pid, &status, 0);
     }
