@@ -1,11 +1,55 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <pthread.h>
+#include <signal.h>
 
-int parseUserInput(char *userInputStr, char **storeArgs[])
+#define MAX_CMD_LEN 1000
+#define MAX_CMD_ARGS 50
+
+int parseUserInput(char *userInputStr, char **storeArgs)
 {
-    char *try[] = {"ls", "-l", "-a"};
-    *storeArgs = try;
+    // char *cmdargv[] = {"ls", "-l", "-a"};
+    storeArgs[0] = strtok(userInputStr, " \n");
+    int i;
+    for (i = 1;
+        storeArgs[i] = strtok(NULL, " \n"), storeArgs[i] != NULL;
+        i++) {}
+}
+
+int printErrorMessage(char** args, int code)
+{
+    switch(code) {
+        case EACCES:
+            printf("Permission DENIED: %s\n", args[0]);
+            break;
+        case ENOENT:
+            printf("Command not found: %s\n", args[0]);
+            break;
+        default:
+            printf("Something bad happened. Error code %d\n", code);
+            printf("You tried to run: %s\n", args[0]);
+    }
+}
+
+void termination_handler(int signum)
+{
+    printf("I'M GOING TO KILL SOMEONE!!!!1\n");
+}
+
+void registerSignalHandler() {
+    struct sigaction new_action, old_action;
+    new_action.sa_handler = termination_handler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction (SIGINT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGINT, &new_action, NULL);
+
 }
 
 int main(int argc, char* argv[])
@@ -13,42 +57,47 @@ int main(int argc, char* argv[])
     pid_t pid;
     int rc = 0;
     int status = 0;
-    char *userinput = NULL;
-    //char *const try[] = {"ls", "-l", "-a"};
-    char **try;
+    char *userinput = malloc(sizeof(char)*MAX_CMD_LEN);
+    char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
 
-    while(!userinput || (strcmp("quit", userinput) != 0))
+    registerSignalHandler();
+
+    while(1)
     {
-        userinput = malloc(sizeof(char)*100);
         printf("_dash > ");
-        scanf("%s", userinput);
+        fgets(userinput, MAX_CMD_LEN, stdin);
+        if (strcmp("quit\n", userinput) == 0) {
+          break;
+        }
 
-        parseUserInput(userinput, &try);
-        printf("try 0: %s\n", try[0]);
-        printf("try 1: %s\n", try[1]);
-        printf("try 2: %s\n", try[2]);
+        parseUserInput(userinput, cmdargv);
         pid = fork();
 
         if(pid == 0) // Child
         {
-            printf("I'm the child!\n");
-            rc = execvp("ls", try);
+            // printf("I'm the child!\n");
+            rc = execvp(cmdargv[0], cmdargv);
             if(rc < 0)
             {
-                printf("Failed in child process!\n");
-                exit(1);
+                printErrorMessage(cmdargv, errno);
             }
         }
         else if( pid < 0) // failed fork
         {
             printf("Fork failed\n");
+            free(userinput);
+            free(cmdargv);
             exit(1);
         }
         else
         {
-            printf("I'm the parent!\n");
+            // printf("I'm the parent!\n");
         }
+
         waitpid(pid, &status, 0);
     }
+    cleanup:
+        free(userinput);
+        free(cmdargv);
     printf("All finished.\n");
 }
