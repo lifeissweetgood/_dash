@@ -5,11 +5,12 @@
 #include <sys/wait.h>
 #include <errno.h>
 
-#define MAX_CMD_LEN 100
+#define MAX_CMD_LEN 1000
+#define MAX_CMD_ARGS 50
 
 int parseUserInput(char *userInputStr, char **storeArgs)
 {
-    // char *try[] = {"ls", "-l", "-a"};
+    // char *cmdargv[] = {"ls", "-l", "-a"};
     storeArgs[0] = strtok(userInputStr, " \n");
     int i;
     for (i = 1;
@@ -37,42 +38,45 @@ int main(int argc, char* argv[])
     pid_t pid;
     int rc = 0;
     int status = 0;
-    char *userinput = NULL;
-    //char *const try[] = {"ls", "-l", "-a"};
-    char **try = (char**) malloc(sizeof(char*) * 10);
+    char *userinput = malloc(sizeof(char)*MAX_CMD_LEN);
+    char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
 
     while(1)
     {
-        userinput = malloc(sizeof(char)*MAX_CMD_LEN);
         printf("_dash > ");
         fgets(userinput, MAX_CMD_LEN, stdin);
         if (strcmp("quit\n", userinput) == 0) {
           break;
         }
 
-        parseUserInput(userinput, try);
+        parseUserInput(userinput, cmdargv);
         pid = fork();
 
         if(pid == 0) // Child
         {
             // printf("I'm the child!\n");
-            rc = execvp(try[0], try);
+            rc = execvp(cmdargv[0], cmdargv);
             if(rc < 0)
             {
-                printErrorMessage(try, errno);
-                exit(1);
+                printErrorMessage(cmdargv, errno);
             }
         }
         else if( pid < 0) // failed fork
         {
             printf("Fork failed\n");
+            free(userinput);
+            free(cmdargv);
             exit(1);
         }
         else
         {
             // printf("I'm the parent!\n");
         }
+
         waitpid(pid, &status, 0);
     }
+    cleanup:
+        free(userinput);
+        free(cmdargv);
     printf("All finished.\n");
 }
