@@ -4,6 +4,8 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <pthread.h>
+#include <signal.h>
 
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
@@ -33,6 +35,23 @@ int printErrorMessage(char** args, int code)
     }
 }
 
+void termination_handler(int signum)
+{
+    printf("I'M GOING TO KILL SOMEONE!!!!1\n");
+}
+
+void registerSignalHandler() {
+    struct sigaction new_action, old_action;
+    new_action.sa_handler = termination_handler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction (SIGINT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGINT, &new_action, NULL);
+
+}
+
 int main(int argc, char* argv[])
 {
     pid_t pid;
@@ -40,6 +59,8 @@ int main(int argc, char* argv[])
     int status = 0;
     char *userinput = malloc(sizeof(char)*MAX_CMD_LEN);
     char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
+
+    registerSignalHandler();
 
     while(1)
     {
