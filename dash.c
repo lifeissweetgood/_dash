@@ -158,7 +158,9 @@ int main(int argc, char* argv[])
         removeNewLine(userInput, formattedInput);
 
         // See if user wants out.
-        if(strcmp("quit", formattedInput) == 0)
+        if((strcmp("quit", formattedInput) == 0) ||
+           (strcmp("exit", formattedInput) == 0) ||
+           (strcmp("q", formattedInput) == 0))
         {
             printf("Quitting!\n");
             goto cleanup;
