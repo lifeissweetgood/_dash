@@ -83,6 +83,7 @@ void registerSignalHandler() {
  */
 int main(int argc, char* argv[])
 {
+    int i;
     int pipefd[2];
     pid_t pid;
     char buf;
@@ -95,6 +96,11 @@ int main(int argc, char* argv[])
     char *userInput = malloc(sizeof(char)*MAX_CMD_LEN);
     char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
 
+    char *cdCmd = NULL;
+    char *cdPathToMoveTo = NULL;
+
+    char *errMsg = NULL;
+
     registerSignalHandler();
 
     while(1)
@@ -102,13 +108,41 @@ int main(int argc, char* argv[])
         printf("_dash > ");
         fgets(userInput, MAX_CMD_LEN, stdin);
 
+        // TODO: Sanitize user input! We're currently hoping the user is a
+        // benelovent, sweet human being. HA!
+
         formattedInput = malloc(sizeof(userInput));
         removeNewLine(userInput, formattedInput);
 
+        // See if user wants out.
         if(strcmp("quit", formattedInput) == 0)
         {
             printf("Quitting!\n");
             goto cleanup;
+        }
+
+        // Check to see if user wants to change working directories
+        cdCmd = strstr(formattedInput, "cd ");
+        if(cdCmd)
+        {
+            cdPathToMoveTo = malloc(sizeof(cdCmd));
+           
+            // We're trusting the user input an awwwwful lot here (see TODO
+            // above)
+            for(i=0; cdCmd[i] != '\0'; i++)
+                cdPathToMoveTo[i] = cdCmd[i+3];
+            cdPathToMoveTo[i+1] = '\0';
+            
+            //printf("Path = %s\n", cdPathToMoveTo);
+
+            if(chdir(cdPathToMoveTo) < 0)
+            {
+                asprintf(&errMsg, "Can't move to '%s'!", cdPathToMoveTo);
+                ERROR(errMsg);
+            }
+
+            // No need to fork/exec, can just move on.
+            continue;
         }
 
         if(strcmp("pipe", formattedInput) == 0)
