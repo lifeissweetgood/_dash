@@ -158,8 +158,7 @@ int main(int argc, char* argv[])
         }
 
         // Check to see if user wants to change working directories
-        cdCmd = strstr(formattedInput, "cd ");
-        if(cdCmd)
+        if( (cdCmd = strstr(formattedInput, "cd ")) != NULL )
         {
             if(changeDir(cdCmd) != 0)
                 ERROR("cd failed.");
