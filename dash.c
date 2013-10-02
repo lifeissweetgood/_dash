@@ -105,6 +105,7 @@ int changeDir(char *cdCommand)
     // Call built-in function to move dirs
     if(chdir(cdPathToMoveTo) < 0)
     {
+        rc = -1;
         asprintf(&errMsg, "Can't move to '%s'!", cdPathToMoveTo);
         ERROR_CLEANUP(errMsg);
     }
