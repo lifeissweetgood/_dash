@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -10,7 +11,9 @@
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
 
-int parseUserInput(char *userInputStr, char **storeArgs)
+static bool got_sigint = false;
+
+static int parseUserInput(char *userInputStr, char **storeArgs)
 {
     // char *cmdargv[] = {"ls", "-l", "-a"};
     storeArgs[0] = strtok(userInputStr, " \n");
@@ -20,7 +23,7 @@ int parseUserInput(char *userInputStr, char **storeArgs)
         i++) {}
 }
 
-int printErrorMessage(char** args, int code)
+static int printErrorMessage(char** args, int code)
 {
     switch(code) {
         case EACCES:
@@ -35,20 +38,19 @@ int printErrorMessage(char** args, int code)
     }
 }
 
-void termination_handler(int signum)
+static void termination_handler(int signum)
 {
-    printf("I'M GOING TO KILL SOMEONE!!!!1\n");
+    got_sigint = true;
 }
 
-void registerSignalHandler() {
-    struct sigaction new_action, old_action;
+static void registerSignalHandler() {
+    struct sigaction new_action;
     new_action.sa_handler = termination_handler;
+    // new_action.sa_handler = SIG_IGN;
     sigemptyset (&new_action.sa_mask);
     new_action.sa_flags = 0;
 
-    sigaction (SIGINT, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN)
-        sigaction (SIGINT, &new_action, NULL);
+    sigaction(SIGINT, &new_action, NULL);
 
 }
 
@@ -59,13 +61,21 @@ int main(int argc, char* argv[])
     int status = 0;
     char *userinput = malloc(sizeof(char)*MAX_CMD_LEN);
     char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
-
     registerSignalHandler();
 
     while(1)
     {
         printf("_dash > ");
-        fgets(userinput, MAX_CMD_LEN, stdin);
+        got_sigint = false;
+        if (fgets(userinput, MAX_CMD_LEN, stdin) == NULL) {
+            if (got_sigint) {
+              printf("\n");
+              continue;
+            } else {
+              // Ctrl+D
+              return 0;
+            }
+        }
         if (strcmp("quit\n", userinput) == 0) {
           break;
         }
@@ -76,6 +86,10 @@ int main(int argc, char* argv[])
         if(pid == 0) // Child
         {
             // printf("I'm the child!\n");
+            char **args = cmdargv;
+            while(*args != NULL) {
+              args++;
+            }
             rc = execvp(cmdargv[0], cmdargv);
             if(rc < 0)
             {
