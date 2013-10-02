@@ -9,6 +9,7 @@
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
 #define ERROR(x) if(x) { printf("ERROR: %s\n", x); exit(1); }
+#define ERROR_CLEANUP(x) if(x) { printf("ERROR: %s\n", x); goto cleanup; }
 
 /**
  * Grabs commands and args and formats them to pass to child process
@@ -31,6 +32,7 @@ void removeNewLine(char *oldInputStr, char *newInputStr)
     int i = 0;
     for(; oldInputStr[i] != '\n'; i++)
         newInputStr[i] = oldInputStr[i];
+    newInputStr[i] = '\0';  // Terminate string properly
 }
 
 /*
@@ -78,12 +80,48 @@ void registerSignalHandler() {
 }
 
 /**
+ * Wrapper for chdir function to change directories
+ *
+ * NOTE: Changes are not persistent after _dash exits
+ */
+int changeDir(char *cdCommand)
+{
+    int i = 0, rc = 0;
+    char *cdPathToMoveTo = NULL;
+    char *errMsg = NULL;
+
+    cdPathToMoveTo = malloc(sizeof(cdCommand));
+   
+    // Essentially, we're copying the original command but removing the 'cd'
+    // part to grab the path.  We're expecting input in the format of:
+    //      cd /path/to/move/to/
+    // 
+    // We're trusting the user input an awwwwful lot here (see TODO
+    // below)
+    for(; cdCommand[i] != '\0'; i++)
+        cdPathToMoveTo[i] = cdCommand[i+3];
+    cdPathToMoveTo[i+1] = '\0';  // Terminate string properly
+   
+    // Call built-in function to move dirs
+    if(chdir(cdPathToMoveTo) < 0)
+    {
+        asprintf(&errMsg, "Can't move to '%s'!", cdPathToMoveTo);
+        ERROR_CLEANUP(errMsg);
+    }
+
+cleanup:
+    free(cdPathToMoveTo);
+    free(errMsg);
+
+    return rc;
+}
+
+/**
  * Main function
  *
  */
 int main(int argc, char* argv[])
 {
-    int i;
     int pipefd[2];
     pid_t pid;
     char buf;
@@ -97,9 +135,6 @@ int main(int argc, char* argv[])
     char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
 
     char *cdCmd = NULL;
-    char *cdPathToMoveTo = NULL;
-
-    char *errMsg = NULL;
 
     registerSignalHandler();
 
@@ -125,21 +160,10 @@ int main(int argc, char* argv[])
         cdCmd = strstr(formattedInput, "cd ");
         if(cdCmd)
         {
-            cdPathToMoveTo = malloc(sizeof(cdCmd));
-           
-            // We're trusting the user input an awwwwful lot here (see TODO
-            // above)
-            for(i=0; cdCmd[i] != '\0'; i++)
-                cdPathToMoveTo[i] = cdCmd[i+3];
-            cdPathToMoveTo[i+1] = '\0';
-            
-            //printf("Path = %s\n", cdPathToMoveTo);
+            if(changeDir(cdCmd) != 0)
+                ERROR("cd failed.");
 
-            if(chdir(cdPathToMoveTo) < 0)
-            {
-                asprintf(&errMsg, "Can't move to '%s'!", cdPathToMoveTo);
-                ERROR(errMsg);
-            }
+            free(cdCmd);
 
             // No need to fork/exec, can just move on.
             continue;
