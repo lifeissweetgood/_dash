@@ -123,7 +123,7 @@ int main(int argc, char* argv[])
         pid = fork();
         if(pid == 0)  // Child Process
         {
-            if(pipeExists != 0)
+            if(pipeExists)
             {
                 dup2(STDOUT_FILENO, pipefd[1]);
                 if(close(pipefd[0]) < 0)
@@ -134,7 +134,7 @@ int main(int argc, char* argv[])
             if(rc < 0)
                 printErrorMessage(cmdargv, errno);
 
-            if(pipeExists != 0)
+            if(pipeExists)
             {
                 if(close(pipefd[1]) < 0)
                     ERROR("Child Proc: Can't close write end of pipe!");
@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
         }
         else  // Parent Process
         {
-            if(pipeExists != 0)
+            if(pipeExists)
             {
                 if(close(pipefd[1]) < 0)
                     ERROR("Parent Proc: Can't close write end of pipe!");
