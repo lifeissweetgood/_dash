@@ -5,25 +5,45 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include <pthread.h>
 #include <signal.h>
 
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
+#define ERROR(x) if(x) { printf("ERROR: %s\n", x); exit(1); }
+#define ERROR_CLEANUP(x) if(x) { printf("ERROR: %s\n", x); goto cleanup; }
+
 
 static bool got_sigint = false;
 
-static int parseUserInput(char *userInputStr, char **storeArgs)
+/**
+ * Grabs commands and args and formats them to pass to child process
+ *
+ */
+static void parseUserInput(char *userInputStr, char **storeArgs)
 {
-    // char *cmdargv[] = {"ls", "-l", "-a"};
-    storeArgs[0] = strtok(userInputStr, " \n");
-    int i;
-    for (i = 1;
-        storeArgs[i] = strtok(NULL, " \n"), storeArgs[i] != NULL;
-        i++) {}
+    storeArgs[0] = strtok(userInputStr, " ");
+    int i = 1;
+    for(; storeArgs[i] = strtok(NULL, " "), storeArgs[i] != NULL; i++)
+    {}
 }
 
-static int printErrorMessage(char** args, int code)
+/**
+ * Removes new line char from user input string.
+ *
+ */
+void removeNewLine(char *oldInputStr, char *newInputStr)
+{
+    int i = 0;
+    for(; oldInputStr[i] != '\n'; i++)
+        newInputStr[i] = oldInputStr[i];
+    newInputStr[i] = '\0';  // Terminate string properly
+}
+
+/*
+ * Displays error message for failed exec call.
+ *
+ */
+int printErrorMessage(char** args, int code)
 {
     switch(code) {
         case EACCES:
@@ -38,11 +58,19 @@ static int printErrorMessage(char** args, int code)
     }
 }
 
+/**
+ * Termination handler for signal.
+ *
+ */
 static void termination_handler(int signum)
 {
     got_sigint = true;
 }
 
+/**
+ * Registers signal handler.
+ *
+ */
 static void registerSignalHandler() {
     struct sigaction new_action;
     new_action.sa_handler = termination_handler;
@@ -54,20 +82,71 @@ static void registerSignalHandler() {
 
 }
 
+/**
+ * Wrapper for chdir function to change directories
+ *
+ * NOTE: Changes are not persistent after _dash exits
+ */
+int changeDir(char *cdCommand)
+{
+    int i = 0, rc = 0;
+    char *cdPathToMoveTo = NULL;
+    char *errMsg = NULL;
+
+    cdPathToMoveTo = malloc(sizeof(cdCommand));
+   
+    // Essentially, we're copying the original command but removing the 'cd'
+    // part to grab the path.  We're expecting input in the format of:
+    //      cd /path/to/move/to/
+    // 
+    // We're trusting the user input an awwwwful lot here (see TODO
+    // below)
+    for(; cdCommand[i] != '\0'; i++)
+        cdPathToMoveTo[i] = cdCommand[i+3];
+    cdPathToMoveTo[i+1] = '\0';  // Terminate string properly
+   
+    // Call built-in function to move dirs
+    if(chdir(cdPathToMoveTo) < 0)
+    {
+        rc = -1;
+        asprintf(&errMsg, "Can't move to '%s'!", cdPathToMoveTo);
+        ERROR_CLEANUP(errMsg);
+    }
+
+cleanup:
+    free(cdPathToMoveTo);
+    free(errMsg);
+
+    return rc;
+}
+
+/**
+ * Main function
+ *
+ */
 int main(int argc, char* argv[])
 {
+    int pipefd[2];
     pid_t pid;
+    char buf;
+
     int rc = 0;
     int status = 0;
-    char *userinput = malloc(sizeof(char)*MAX_CMD_LEN);
+    int pipeExists = 0;
+
+    char *formattedInput = NULL;
+    char *userInput = malloc(sizeof(char)*MAX_CMD_LEN);
     char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
+
+    char *cdCmd = NULL;
+
     registerSignalHandler();
 
     while(1)
     {
         printf("_dash > ");
         got_sigint = false;
-        if (fgets(userinput, MAX_CMD_LEN, stdin) == NULL) {
+        if (fgets(userInput, MAX_CMD_LEN, stdin) == NULL) {
             if (got_sigint) {
               printf("\n");
               continue;
@@ -76,37 +155,100 @@ int main(int argc, char* argv[])
               return 0;
             }
         }
-        if (strcmp("quit\n", userinput) == 0) {
-          break;
+
+
+        // TODO: Sanitize user input! We're currently hoping the user is a
+        // benelovent, sweet human being. HA!
+
+        formattedInput = malloc(sizeof(userInput));
+        removeNewLine(userInput, formattedInput);
+
+        // See if user wants out.
+        if((strcmp("quit", formattedInput) == 0) ||
+           (strcmp("exit", formattedInput) == 0) ||
+           (strcmp("q", formattedInput) == 0))
+        {
+            printf("Quitting!\n");
+            goto cleanup;
         }
 
-        parseUserInput(userinput, cmdargv);
-        pid = fork();
-
-        if(pid == 0) // Child
+        // Check to see if user wants to change working directories
+        if( (cdCmd = strstr(formattedInput, "cd ")) != NULL )
         {
+            if(changeDir(cdCmd) != 0)
+                ERROR("cd failed.");
+
+            free(cdCmd);
+
+            // No need to fork/exec, can just move on.
+            continue;
+        }
+
+        if(strcmp("pipe", formattedInput) == 0)
+        {
+            if(pipe(pipefd) < 0)
+                ERROR("Can't create pipe!");
+            pipeExists = 1;
+        }
+
+        parseUserInput(formattedInput, cmdargv);
+
+        pid = fork();
+        if(pid == 0)  // Child Process
+        {
+            if(pipeExists)
+            {
+                dup2(STDOUT_FILENO, pipefd[1]);
+                if(close(pipefd[0]) < 0)
+                    ERROR("Child Proc: Can't close read end of pipe!");
+            }
+
             rc = execvp(cmdargv[0], cmdargv);
             if(rc < 0)
-            {
                 printErrorMessage(cmdargv, errno);
+
+            if(pipeExists)
+            {
+                if(close(pipefd[1]) < 0)
+                    ERROR("Child Proc: Can't close write end of pipe!");
             }
-        }
-        else if( pid < 0) // failed fork
-        {
-            printf("Fork failed\n");
-            free(userinput);
-            free(cmdargv);
+
+            // Child process needs to exit out or else program never exists.
             exit(1);
         }
-        else
+        else if( pid < 0)  // Fork failed. Boo.
         {
-            // printf("I'm the parent!\n");
+            free(formattedInput);
+            free(userInput);
+            free(cmdargv);
+            ERROR("Fork failed\n");
+        }
+        else  // Parent Process
+        {
+            if(pipeExists)
+            {
+                if(close(pipefd[1]) < 0)
+                    ERROR("Parent Proc: Can't close write end of pipe!");
+                
+                while(read(pipefd[0], &buf, 1) == 1)
+                    printf("%c", buf);
+                
+                if(close(pipefd[0]) < 0)
+                    ERROR("Parent Proc: Can't close read end of pipe!");
+            }
         }
 
         waitpid(pid, &status, 0);
+        pipeExists = 0;
     }
-    cleanup:
-        free(userinput);
-        free(cmdargv);
+
+/* Cleanup! */
+cleanup:
+    free(formattedInput);
+    free(userInput);
+    free(cmdargv);
+
     printf("All finished.\n");
+
+    return 0;
 }
