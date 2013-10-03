@@ -85,11 +85,6 @@ int main(int argc, char* argv[])
 
         if(pid == 0) // Child
         {
-            // printf("I'm the child!\n");
-            char **args = cmdargv;
-            while(*args != NULL) {
-              args++;
-            }
             rc = execvp(cmdargv[0], cmdargv);
             if(rc < 0)
             {
