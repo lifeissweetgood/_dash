@@ -10,7 +10,10 @@
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
 #define ERROR(x) if(x) { printf("ERROR: %s\n", x); exit(1); }
-#define ERROR_CLEANUP(x) if(x) { printf("ERROR: %s\n", x); goto cleanup; }
+#define ERROR_CLEANUP(x) if(x) { printf("ERROR: %s\n", x); \
+                                rc = -__LINE__; goto cleanup; }
+#define ASSERT(x) if(x) { printf("ASSERT: Assert failed!\n"); \
+                                rc = -__LINE__; goto cleanup; }
 
 
 static bool got_sigint = false;
@@ -24,7 +27,7 @@ static void parseUserInput(char *userInputStr, char **storeArgs)
     storeArgs[0] = strtok(userInputStr, " ");
     int i = 1;
     for(; storeArgs[i] = strtok(NULL, " "), storeArgs[i] != NULL; i++)
-    {}
+    { printf("storeArgs[%d] = %s\n", i, storeArgs[i]);}
 }
 
 /**
@@ -121,17 +124,79 @@ cleanup:
 }
 
 /**
+ * Executes the fork
+ */
+int execute_fork(char **cmdargv, int pipeExists)
+{
+    char buf;
+    int pipefd[2];
+    pid_t pid;
+
+    int rc = 0;
+    int status = 0;
+
+    if(pipeExists)
+    {
+        if(pipe(pipefd) < 0)
+            ERROR("Can't create pipe!");
+    }
+
+    pid = fork();
+    if(pid == 0)  // Child Process
+    {
+        if(pipeExists)
+        {
+            dup2(STDOUT_FILENO, pipefd[1]);
+            if(close(pipefd[0]) < 0)
+                ERROR("Child Proc: Can't close read end of pipe!");
+        }
+
+        rc = execvp(cmdargv[0], cmdargv);
+        if(rc < 0)
+            printErrorMessage(cmdargv, errno);
+
+        if(pipeExists)
+        {
+            if(close(pipefd[1]) < 0)
+                ERROR("Child Proc: Can't close write end of pipe!");
+        }
+
+        // Child process needs to exit out or else program never exists.
+        exit(1);
+    }
+    else if( pid < 0)  // Fork failed. Boo.
+    {
+        ERROR_CLEANUP("Fork failed\n");
+    }
+    else  // Parent Process
+    {
+        if(pipeExists)
+        {
+            if(close(pipefd[1]) < 0)
+                ERROR_CLEANUP("Parent Proc: Can't close write end of pipe!");
+            
+            while(read(pipefd[0], &buf, 1) == 1)
+                printf("%c", buf);
+            
+            if(close(pipefd[0]) < 0)
+                ERROR_CLEANUP("Parent Proc: Can't close read end of pipe!");
+        }
+    }
+
+    waitpid(pid, &status, 0);
+
+cleanup:
+
+    return rc;
+}
+
+/**
  * Main function
  *
  */
 int main(int argc, char* argv[])
 {
-    int pipefd[2];
-    pid_t pid;
-    char buf;
-
     int rc = 0;
-    int status = 0;
     int pipeExists = 0;
 
     char *formattedInput = NULL;
@@ -139,6 +204,7 @@ int main(int argc, char* argv[])
     char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
 
     char *cdCmd = NULL;
+    char *pipeCmd = NULL;
 
     registerSignalHandler();
 
@@ -184,61 +250,15 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        if(strcmp("pipe", formattedInput) == 0)
-        {
-            if(pipe(pipefd) < 0)
-                ERROR("Can't create pipe!");
+        // Check to see if user wants to pipe commands
+        if( (pipeCmd = strstr(formattedInput, "|")) != NULL )
             pipeExists = 1;
-        }
 
         parseUserInput(formattedInput, cmdargv);
 
-        pid = fork();
-        if(pid == 0)  // Child Process
-        {
-            if(pipeExists)
-            {
-                dup2(STDOUT_FILENO, pipefd[1]);
-                if(close(pipefd[0]) < 0)
-                    ERROR("Child Proc: Can't close read end of pipe!");
-            }
+        rc = execute_fork(cmdargv, pipeExists);
+        ASSERT( rc != 0 );
 
-            rc = execvp(cmdargv[0], cmdargv);
-            if(rc < 0)
-                printErrorMessage(cmdargv, errno);
-
-            if(pipeExists)
-            {
-                if(close(pipefd[1]) < 0)
-                    ERROR("Child Proc: Can't close write end of pipe!");
-            }
-
-            // Child process needs to exit out or else program never exists.
-            exit(1);
-        }
-        else if( pid < 0)  // Fork failed. Boo.
-        {
-            free(formattedInput);
-            free(userInput);
-            free(cmdargv);
-            ERROR("Fork failed\n");
-        }
-        else  // Parent Process
-        {
-            if(pipeExists)
-            {
-                if(close(pipefd[1]) < 0)
-                    ERROR("Parent Proc: Can't close write end of pipe!");
-                
-                while(read(pipefd[0], &buf, 1) == 1)
-                    printf("%c", buf);
-                
-                if(close(pipefd[0]) < 0)
-                    ERROR("Parent Proc: Can't close read end of pipe!");
-            }
-        }
-
-        waitpid(pid, &status, 0);
         pipeExists = 0;
     }
 
