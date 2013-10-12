@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+#define _GNU_SOURCE /* for asprintf */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,14 +22,37 @@ static bool got_sigint = false;
 
 /**
  * Grabs commands and args and formats them to pass to child process
- *
+ * No escape characters - " " is the only delimiter.
  */
-static void parseUserInput(char *userInputStr, char **storeArgs)
+static void parseUserInput(const char *userInputStr, char **storeArgs)
 {
-    storeArgs[0] = strtok(userInputStr, " ");
-    int i = 1;
-    for(; storeArgs[i] = strtok(NULL, " "), storeArgs[i] != NULL; i++)
-    {}
+    unsigned int i;
+    unsigned int arg = 0;
+    unsigned int string_start = 0;
+    unsigned int cur_string_len = 0;
+    unsigned int last_was_space = 1;
+
+    for (i = 0; i <= strlen(userInputStr); i++) {
+        if ((userInputStr[i] == ' ') || (userInputStr[i] == '\0')) {
+            if (!last_was_space) {
+                storeArgs[arg] = strndup(&userInputStr[string_start], cur_string_len + 1);
+                if (storeArgs[arg] == NULL)
+                    ERROR("Failed malloc!\n");
+                storeArgs[arg][cur_string_len] = '\0';
+                printf("storeArgs[%d] = %s\n", arg, storeArgs[arg]);
+                
+                arg += 1;
+                cur_string_len = 0;
+                string_start = i + 1;
+            } else { /* multiple spaces in a row */
+                string_start += 1;
+            }
+            last_was_space = 1;
+        } else {
+            last_was_space = 0;
+            cur_string_len += 1;
+        }
+    }
 }
 
 /**
@@ -48,7 +71,7 @@ void removeNewLine(char *oldInputStr, char *newInputStr)
  * Displays error message for failed exec call.
  *
  */
-int printErrorMessage(char** args, int code)
+void printErrorMessage(char** args, int code)
 {
     switch(code) {
         case EACCES:
@@ -69,6 +92,7 @@ int printErrorMessage(char** args, int code)
  */
 static void termination_handler(int signum)
 {
+    (void) signum;
     got_sigint = true;
     printf("\tIt's handled.");
 }
@@ -138,15 +162,25 @@ int main(int argc, char* argv[])
     char result_buf[4096];
 
     int counter = 0;
+    int i, cmdargv_len;
     int rc = 0;
     int status = 0;
     int pipeExists = 0;
 
     char *formattedInput = NULL;
-    char *userInput = malloc(sizeof(char)*MAX_CMD_LEN);
-    char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
-
+    char *userInput = NULL;
+    char **cmdargv = NULL;
     char *cdCmd = NULL;
+
+    if((userInput = malloc(sizeof(char)*MAX_CMD_LEN)) == NULL)
+        ERROR("Failed malloc\n");
+
+    cmdargv_len = sizeof(char*) * MAX_CMD_ARGS;
+    if((cmdargv = (char**) malloc(cmdargv_len)) == NULL) {
+        ERROR("Failed malloc\n");
+    } else {
+        memset(cmdargv, '\0', sizeof(char*) * MAX_CMD_ARGS);
+    }
 
     registerSignalHandler();
 
@@ -163,10 +197,6 @@ int main(int argc, char* argv[])
               return 0;
             }
         }
-
-
-        // TODO: Sanitize user input! We're currently hoping the user is a
-        // benelovent, sweet human being. HA!
 
         // TODO: Sanitize user input! We're currently hoping the user is a
         // benelovent, sweet human being. HA!
@@ -274,9 +304,20 @@ int main(int argc, char* argv[])
 cleanup:
     free(formattedInput);
     free(userInput);
+    if (cmdargv) {
+        for (i = 0; i < MAX_CMD_ARGS; i++) {
+            free(cmdargv[i]); /* free(NULL) is ok with glibc */
+        }
+    }
     free(cmdargv);
 
     printf("All finished.\n");
 
     return 0;
+
+    if(0)
+    {
+        (void) argc;
+        (void) argv;
+    }
 }
