@@ -1,5 +1,5 @@
 make:
-	gcc -o dash dash.c
+	gcc -o dash dash.c -ggdb3 -Wall -Wextra -pedantic -std=gnu99
 
 time-test:
 	gcc -o dash-read dash_read_time.c
