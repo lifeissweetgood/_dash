@@ -15,7 +15,10 @@
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
 #define ERROR(x) if(x) { printf("ERROR: %s\n", x); exit(1); }
-#define ERROR_CLEANUP(x) if(x) { printf("ERROR: %s\n", x); goto cleanup; }
+#define ERROR_CLEANUP(x) if(x) { printf("ERROR: %s\n", x); \
+                                rc = -__LINE__; goto cleanup; }
+#define ASSERT(x) if(x) { printf("ASSERT: Assert failed!\n"); \
+                                rc = -__LINE__; goto cleanup; }
 
 // Signal received bool
 static bool got_sigint = false;
@@ -50,6 +53,42 @@ static void parseUserInput(const char *userInputStr, char **storeArgs)
             last_was_space = 1;
         } else {
             last_was_space = 0;
+            cur_string_len += 1;
+        }
+    }
+}
+// TODO: Refactor/Combine with parseUserInput
+/**
+ * Splits pipe commands into separate command chunks
+ *
+ */
+static void parsePipeInput(const char *pipeInputStr, char **storeArgs)
+{
+    unsigned int i;
+    unsigned int arg = 0;
+    unsigned int string_start = 0;
+    unsigned int cur_string_len = 0;
+    unsigned int last_was_pipe = 1;
+
+    for (i = 0; i <= strlen(pipeInputStr); i++) {
+        if ((pipeInputStr[i] == '|') || (pipeInputStr[i] == '\0')) {
+            if (!last_was_pipe) {
+                storeArgs[arg] = strndup(&pipeInputStr[string_start], cur_string_len + 1);
+                if (storeArgs[arg] == NULL)
+                    ERROR("Failed malloc!\n");
+                storeArgs[arg][cur_string_len] = '\0';
+                printf("storeArgsPipe[%d] = %s\n", arg, storeArgs[arg]);
+                
+                arg += 1;
+                cur_string_len = 0;
+                string_start = i + 2;
+            } else { /* multiple pipes in a row */
+                string_start += 1;
+            }
+            last_was_pipe = 1;
+            cur_string_len -= 1;
+        } else {
+            last_was_pipe = 0;
             cur_string_len += 1;
         }
     }
@@ -150,6 +189,129 @@ cleanup:
     return rc;
 }
 
+static int array_len(char **array)
+{
+    int i = 0;
+
+    for(; array[i] != NULL; i++)
+    {}
+
+    return i;
+}
+
+static int execute_fork(char **cmdargv, int pipeExists)
+{
+    pid_t pid;
+    int i = 1, rc = 0, status = 0, tmp_argv_len = 0;
+    char **tmp_cmd_argv = NULL;
+    char *first_cmd = NULL;
+    char **first_cmd_args = NULL;
+
+    tmp_argv_len = sizeof(char*) * (array_len(cmdargv) - 1);
+    if((tmp_cmd_argv = (char**) malloc(tmp_argv_len)) == NULL)
+    {
+        ERROR("Failed malloc!\n");
+    } else {
+        memset(tmp_cmd_argv, '\0', tmp_argv_len);
+    }
+    if((first_cmd_args = (char**) malloc(tmp_argv_len)) == NULL)
+    {
+        ERROR("Failed malloc!\n");
+    } else {
+        memset(first_cmd_args, '\0', tmp_argv_len);
+    }
+
+    pid = fork();
+    if(pid == 0)  // Child Process
+    {
+        printf("%d: In child! Pipe exists = %d\n", __LINE__, pipeExists);
+            for(i=0; cmdargv[i] != NULL; i++)
+                printf("%d cmdargv[%d]: %s\n", __LINE__, i, cmdargv[i]);
+
+        // Single command to execute
+        if(!pipeExists)
+        {
+            // Split args for command, if there are any, then execute
+            if(strstr(cmdargv[0], " ") != NULL)
+            {
+                first_cmd = cmdargv[0];
+                memset(first_cmd_args, '\0', tmp_argv_len);
+                parseUserInput(first_cmd, first_cmd_args);
+                if(execvp(first_cmd_args[0], first_cmd_args) < 0)
+                    printErrorMessage(first_cmd_args, errno);
+            }
+            else // ...or just execute.
+            {
+                if(execvp(cmdargv[0], cmdargv) < 0)
+                    printErrorMessage(cmdargv, errno);
+            }
+        }
+
+        // There's piping involved and multiple commands
+        // to parse through still
+        printf("%d: In child!\n", __LINE__);
+        
+        // Split cmdargv into smaller chunk
+        for(i=1; cmdargv[i] != NULL; i++)
+            tmp_cmd_argv[i-1] = cmdargv[i];
+        
+        // DEBUG
+        for(i=0; tmp_cmd_argv[i] != NULL; i++)
+            printf("tmp_cmd_argv[%d]: %s\n", i, tmp_cmd_argv[i]);
+
+        // Single out first cmd so it doesn't get forgotten
+        first_cmd = cmdargv[0];
+        parseUserInput(first_cmd, first_cmd_args);
+
+        // Cmdargv now has the new list that is
+        // without the first command
+        cmdargv = tmp_cmd_argv;
+        
+        // DEBUG
+        printf("%d: In child!\n", __LINE__);
+        for(i=0; cmdargv[i] != NULL; i++)
+            printf("cmdargv[%d]: %s\n", i, cmdargv[i]);
+        
+        // Set pipe up
+        
+        // If cmdargv only has 1 element, we have reached the base
+        // case and thus we can treat it like a single command above
+        if(array_len(cmdargv) == 1)
+            pipeExists = 0;
+        
+        /* Recursive calls */
+        // Call the single command
+        if( execute_fork(first_cmd_args, 0) < 0 )
+            ERROR_CLEANUP("Recursive exec_fork() call failed!");
+
+        // Repeat the process for the rest of the commands
+        if( execute_fork(cmdargv, pipeExists) < 0 )
+            ERROR_CLEANUP("Recursive exec_fork() call failed!");
+
+        // DEBUG
+        printf("%d: In child!\n", __LINE__);
+
+        // Child process needs to exit out or else program never exists.
+        exit(1);
+    }
+    else if( pid < 0)  // Fork failed. Boo.
+    {
+        ERROR("Fork failed\n");
+    }
+    else  // Parent Process
+    {
+        printf("Hello.\n");
+    }
+    
+    // Wait on child
+    waitpid(pid, &status, 0);
+
+/* Cleanup! */
+cleanup:
+
+    return rc;
+}
+
 /**
  * Main function
  *
@@ -158,19 +320,18 @@ int main(int argc, char* argv[])
 {
     int pipefd[2];
     pid_t pid;
+
     char buf;
     char result_buf[4096];
 
-    int counter = 0;
     int i, cmdargv_len;
-    int rc = 0;
+    int rc = 0, counter = 0;
     int status = 0;
     int pipeExists = 0;
 
-    char *formattedInput = NULL;
-    char *userInput = NULL;
     char **cmdargv = NULL;
-    char *cdCmd = NULL;
+    char *formattedInput = NULL, *userInput = NULL,
+         *cdCmd = NULL, *pipe_cmd = NULL;
 
     if((userInput = malloc(sizeof(char)*MAX_CMD_LEN)) == NULL)
         ERROR("Failed malloc\n");
@@ -225,14 +386,19 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        if(strcmp("ls", formattedInput) == 0)
+        if( (pipe_cmd = strstr(formattedInput, "|")) != NULL )
         {
             if(pipe(pipefd) < 0)
                 ERROR("Can't create pipe!");
             pipeExists = 1;
+            parsePipeInput(formattedInput, cmdargv);
         }
+        else
+            parseUserInput(formattedInput, cmdargv);
 
-        parseUserInput(formattedInput, cmdargv);
+        if( execute_fork(cmdargv, pipeExists) < 0 )
+            ERROR("Bad exec!");
+        goto cleanup;
 
         pid = fork();
         if(pid == 0)  // Child Process
@@ -292,12 +458,18 @@ int main(int argc, char* argv[])
         // Wait on child
         waitpid(pid, &status, 0);
 
-        // Clear buffer, reset buffer counter
-        memset(result_buf, 0, sizeof(result_buf));
-        counter = 0;
+        if(pipeExists)
+        {
+            // Clear buffer, reset buffer counter
+            memset(result_buf, 0, sizeof(result_buf));
+            counter = 0;
+        }
 
         // Reset pipe bool
         pipeExists = 0;
+
+        // Reset cmdargv
+        memset(cmdargv, '\0', sizeof(char*) * MAX_CMD_ARGS);
     }
 
 /* Cleanup! */
