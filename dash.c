@@ -21,6 +21,14 @@
 
 static bool got_sigint = false;
 
+void show_cmd(char **cmd) {
+    int i;
+
+    if (!cmd) return;
+    for(i = 0; cmd[i] != NULL; i++)
+        printf("cmd[%i] = %s\n", i, cmd[i]);
+}
+
 /**
  * Grabs commands and args and formats them to pass to child process
  * No escape characters - " " is the only delimiter.
@@ -54,6 +62,58 @@ static void parseUserInput(const char *userInputStr, char **storeArgs)
             cur_string_len += 1;
         }
     }
+}
+
+/* This function assumes userInputStr is immutable...
+and shares the actual string data with it */
+char ***parse_commands(char **userInputStr)
+{
+    int i = 0;
+    int j, cmdlen, cmd_start;
+    int pipes = 0;
+    int cmdi = 0;
+    int command_parts = 0;
+    const char *tmp;
+    char **command = NULL;
+    char ***commands = NULL;
+
+    for (i = 0; userInputStr[i] != NULL; i++) {
+        tmp = userInputStr[i];
+        if (tmp && (tmp[0] == '|') && (tmp[1] == '\0'))
+            pipes += 1;
+    }
+
+    cmdlen = sizeof(char*) * (pipes + 2);
+    commands = malloc(cmdlen);
+    // TODO: check for failure
+    memset(commands, '\0', cmdlen);
+
+    printf("got here\n");
+    cmd_start = 0;
+    for(i = 0; userInputStr[i] != NULL; i++) {
+        tmp = userInputStr[i];
+        if ((userInputStr[i+1] == NULL) || ((tmp[0] == '|') && (tmp[1] == '\0'))) {
+            cmdlen = sizeof(char*) * (command_parts + 1);
+            command = malloc(cmdlen);
+            // TODO: check for failure
+            memset(command, '\0', cmdlen);
+            // TODO: remove printf("found a command\n");
+            for(j = 0; j < command_parts; j++) {
+                command[j] = userInputStr[cmd_start + j];
+                // TODO: remove printf("command[%i] is %s\n", j, command[j]);
+            }
+            command[j] = NULL;
+            cmd_start = i + 1;
+            commands[cmdi] = command;
+            cmdi += 1;
+            // TODO: remove show_cmd(command);
+        }
+        else {
+            command_parts += 1;
+        }
+    }
+    printf("done\n");
+    return commands;
 }
 
 /**
@@ -149,6 +209,64 @@ cleanup:
     return rc;
 }
 
+
+int run_pipe(char **cmd1, char **cmd2) {
+    int pipefd[2];
+    int cpid1, cpid2;
+    int piperet, rc;
+    //char buf; // inefficient!
+
+    printf("show 1\n");
+    show_cmd(cmd1);
+    printf("show 2\n");
+    show_cmd(cmd2);
+    piperet = pipe(pipefd);
+    if (piperet == -1) {
+        // TODO: handle this
+    }
+    
+    cpid1 = fork();
+    if (cpid1 == 0) { // set up the reader child
+        printf("kid1 launched, it'll be %s!\n", cmd2[0]);
+        close(pipefd[1]);
+        dup2(pipefd[0], 0);
+
+        rc = execvp(cmd2[0], cmd2);
+        if(rc < 0)
+                printErrorMessage(cmd1, errno);
+
+        /*while(read(pipefd[0], &buf, 1) > 0) {
+            printf("yay, kid1 writing!\n");
+            write(STDOUT_FILENO, &buf, 1);
+        }
+        write(STDOUT_FILENO, "\n", 1);
+        close(pipefd[0]);
+        _exit(EXIT_SUCCESS); */ 
+    }
+    
+    cpid2 = fork();
+    if (cpid2 == 0) { // set up the writer child
+        printf("kid2 launched!\n");
+        close(pipefd[0]);
+        dup2(pipefd[1], 1);
+        
+        rc = execvp(cmd1[0], cmd1);
+        if(rc < 0)
+                printErrorMessage(cmd2, errno);
+
+        /*close(pipefd[1]);
+        _exit(EXIT_SUCCESS);*/
+    }
+    
+    if ((cpid1 == -1) || (cpid2 == -1)) {
+        // TODO: handle this
+    }
+
+    wait(NULL);
+    printf("Yay, kids done\n");
+    return 0;
+}
+
 /**
  * Executes the fork
  */
@@ -166,18 +284,18 @@ int execute_fork(char **cmdargv, int pipeExists)
     while(cmdargv[cursor] != NULL)
     {
         for(j=0; cmdargv[j] != NULL; j++)
-            printf("CHECKINGCHECKING %d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
+            ;//printf("CHECKINGCHECKING %d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
         if(pipeExists)
         {
             if(pipe(pipefd) < 0)
                 ERROR("Can't create pipe!");
-        }
+        }    
 
         if((subCmdArgv = (char**) malloc(sizeof(char*) * j)) == NULL)
             ERROR("Failed malloc!\n");
 
-        for(j=0; cmdargv[j] != NULL; j++)
-            printf("CHECKINGCHECKING %d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
+        //for(j=0; cmdargv[j] != NULL; j++)
+            //printf("CHECKINGCHECKING %d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
 
         // Parse out each command separated by a | (pipe)
         for(i = 0; cmdargv[i+cursor] != NULL; i++)
@@ -252,6 +370,7 @@ cleanup:
     return rc;
 }
 
+
 /**
  * Main function
  *
@@ -268,6 +387,7 @@ int main(int argc, char* argv[])
 
     char *cdCmd = NULL;
     char *pipeCmd = NULL;
+    char ***commands = NULL;
 
     if((userInput = malloc(sizeof(char)*MAX_CMD_LEN)) == NULL)
         ERROR("Failed malloc\n");
@@ -335,12 +455,17 @@ int main(int argc, char* argv[])
         }
 
         parseUserInput(formattedInput, cmdargv);
+        commands = parse_commands(cmdargv);
+        // TODO: check for error
 
-        for(j=0; cmdargv[j] != NULL; j++)
-            printf("%d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
+        //for(j=0; cmdargv[j] != NULL; j++)
+        //    printf("%d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
 
-        rc = execute_fork(cmdargv, pipeExists);
-        ASSERT( rc != 0 );
+        //rc = execute_fork(cmdargv, pipeExists);
+        printf("caller: first command is:\n");
+        show_cmd(commands[0]);
+        rc = run_pipe(commands[0], commands[1]);
+        ASSERT( rc == 0 );
 
         pipeExists = 0;
     }
