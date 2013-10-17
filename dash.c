@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -16,11 +17,14 @@
 #define ERROR(x) if(x) { printf("ERROR: %s\n", x); exit(1); }
 #define ERROR_CLEANUP(x) if(x) { printf("ERROR: %s\n", x); goto cleanup; }
 
+// Signal received bool
+static bool got_sigint = false;
+
 /**
  * Grabs commands and args and formats them to pass to child process
  *
  */
-void parseUserInput(char *userInputStr, char **storeArgs)
+static void parseUserInput(char *userInputStr, char **storeArgs)
 {
     storeArgs[0] = strtok(userInputStr, " ");
     int i = 1;
@@ -63,25 +67,25 @@ int printErrorMessage(char** args, int code)
  * Termination handler for signal.
  *
  */
-void termination_handler(int signum)
+static void termination_handler(int signum)
 {
-    printf("I'M GOING TO KILL SOMEONE!!!!1\n");
-    exit(1);
+    got_sigint = true;
+    printf("\tIt's handled.");
 }
 
 /**
  * Registers signal handler.
  *
  */
-void registerSignalHandler() {
-    struct sigaction new_action, old_action;
+static void registerSignalHandler() {
+    struct sigaction new_action;
     new_action.sa_handler = termination_handler;
+    // new_action.sa_handler = SIG_IGN;
     sigemptyset (&new_action.sa_mask);
     new_action.sa_flags = 0;
 
-    sigaction (SIGINT, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN)
-        sigaction (SIGINT, &new_action, NULL);
+    sigaction(SIGINT, &new_action, NULL);
+
 }
 
 /**
@@ -149,7 +153,20 @@ int main(int argc, char* argv[])
     while(1)
     {
         printf("_dash > ");
-        fgets(userInput, MAX_CMD_LEN, stdin);
+        got_sigint = false;
+        if (fgets(userInput, MAX_CMD_LEN, stdin) == NULL) {
+            if (got_sigint) {
+              printf("\n");
+              continue;
+            } else {
+              // Ctrl+D
+              return 0;
+            }
+        }
+
+
+        // TODO: Sanitize user input! We're currently hoping the user is a
+        // benelovent, sweet human being. HA!
 
         // TODO: Sanitize user input! We're currently hoping the user is a
         // benelovent, sweet human being. HA!
