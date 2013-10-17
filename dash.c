@@ -253,7 +253,7 @@ static int execute_fork(char **cmdargv, int pipeExists)
         
         // Split cmdargv into smaller chunk
         for(i=1; cmdargv[i] != NULL; i++)
-            tmp_cmd_argv[i-1] = strndup(cmdargv[i], strlen(cmdargv[i]);
+            tmp_cmd_argv[i-1] = strndup(cmdargv[i], strlen(cmdargv[i]));
         
         // DEBUG
         for(i=0; tmp_cmd_argv[i] != NULL; i++)
