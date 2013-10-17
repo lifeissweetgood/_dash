@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <signal.h>
 
+#include <sys/time.h>
 
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
@@ -131,6 +132,7 @@ int main(int argc, char* argv[])
     pid_t pid;
     char buf;
     char result_buf[4096];
+    //FILE *fd_pipe = NULL;
 
     int counter = 0;
     int rc = 0;
@@ -142,6 +144,9 @@ int main(int argc, char* argv[])
     char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
 
     char *cdCmd = NULL;
+
+    struct timeval start, end;
+    long long t1, t2;
 
     registerSignalHandler();
 
@@ -226,17 +231,40 @@ int main(int argc, char* argv[])
                 if(close(pipefd[1]) < 0)
                     ERROR("Parent Proc: Can't close write end of pipe!");
 
+                // Start time
+                gettimeofday(&start, NULL);
+
+                //if((fd_pipe = fdopen(pipefd[0], "r")) == NULL)
+                //    ERROR("Can't open file pointer for pipe!\n");
+
                 /* Read & spit out output from child process */
+                //while(fgets(buf, sizeof(buf), fd_pipe) != NULL)
                 while(read(pipefd[0], &buf, sizeof(buf)) == 1)
                 {
+                    //printf("Parent %d: %s\n",count, buf);
+                    //printf("%s", newline_removed_buf);
                     result_buf[counter] = buf;
                     counter++;
                 }
-                printf("%s", result_buf);
+
+                // End time
+                gettimeofday(&end, NULL);
+
+                // Calculate diff
+                t1 = start.tv_sec * 1000000 + start.tv_usec;
+                t2 = end.tv_sec * 1000000 + end.tv_usec;
+
+                printf("%f: %s\n", (double) t2 - t1, result_buf);
 
                 /* Close read end of pipe, don't need it anymore */
                 if(close(pipefd[0]) < 0)
                     ERROR("Child Proc: Can't close write end of pipe!");
+                
+                /*if(fclose(fd_pipe) != 0)
+                {
+                    perror("DAPH");
+                    ERROR("Can't close file pointer to pipe!\n");
+                }*/
             }
         }
 

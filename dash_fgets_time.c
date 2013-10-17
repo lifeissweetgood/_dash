@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <signal.h>
 
+#include <sys/time.h>
 
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
@@ -129,8 +130,11 @@ int main(int argc, char* argv[])
 {
     int pipefd[2];
     pid_t pid;
-    char buf;
-    char result_buf[4096];
+    //char buf;
+    //char result_buf[4096];
+    char buf[4096];
+    char newline_removed_buf[4096];
+    FILE *fd_pipe = NULL;
 
     int counter = 0;
     int rc = 0;
@@ -142,6 +146,9 @@ int main(int argc, char* argv[])
     char **cmdargv = (char**) malloc(sizeof(char*) * MAX_CMD_ARGS);
 
     char *cdCmd = NULL;
+
+    struct timeval start, end;
+    long long t1, t2;
 
     registerSignalHandler();
 
@@ -226,17 +233,41 @@ int main(int argc, char* argv[])
                 if(close(pipefd[1]) < 0)
                     ERROR("Parent Proc: Can't close write end of pipe!");
 
+                // Start time
+                gettimeofday(&start, NULL);
+
+                if((fd_pipe = fdopen(pipefd[0], "r")) == NULL)
+                    ERROR("Can't open file pointer for pipe!\n");
+
                 /* Read & spit out output from child process */
-                while(read(pipefd[0], &buf, sizeof(buf)) == 1)
+                while(fgets(buf, sizeof(buf), fd_pipe) != NULL)
+                //while(read(pipefd[0], &buf, sizeof(buf)) == 1)
                 {
-                    result_buf[counter] = buf;
+                    //printf("Parent %d: %s\n",count, buf);
+                    removeNewLine(buf, newline_removed_buf);
+                    printf("%s", newline_removed_buf);
+                    //result_buf[counter] = buf;
                     counter++;
                 }
-                printf("%s", result_buf);
+
+                // End time
+                gettimeofday(&end, NULL);
+
+                // Calculate diff
+                t1 = start.tv_sec * 1000000 + start.tv_usec;
+                t2 = end.tv_sec * 1000000 + end.tv_usec;
+
+                printf("%f\n", (double) t2 - t1);
 
                 /* Close read end of pipe, don't need it anymore */
-                if(close(pipefd[0]) < 0)
-                    ERROR("Child Proc: Can't close write end of pipe!");
+                //if(close(pipefd[0]) < 0)
+                //    ERROR("Child Proc: Can't close write end of pipe!");
+                
+                if(fclose(fd_pipe) != 0)
+                {
+                    perror("DAPH");
+                    ERROR("Can't close file pointer to pipe!\n");
+                }
             }
         }
 
@@ -244,7 +275,8 @@ int main(int argc, char* argv[])
         waitpid(pid, &status, 0);
 
         // Clear buffer, reset buffer counter
-        memset(result_buf, 0, sizeof(result_buf));
+        memset(newline_removed_buf, 0, sizeof(newline_removed_buf));
+        memset(buf, 0, sizeof(buf));
         counter = 0;
 
         // Reset pipe bool
