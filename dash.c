@@ -1,10 +1,15 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+
 
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 50
@@ -85,8 +90,11 @@ int main(int argc, char* argv[])
 {
     int pipefd[2];
     pid_t pid;
-    char buf;
+    //char buf;
+    char buf[4096];
+    FILE *fd_pipe = NULL;
 
+    int count;
     int rc = 0;
     int status = 0;
     int pipeExists = 0;
@@ -99,6 +107,7 @@ int main(int argc, char* argv[])
 
     while(1)
     {
+        count = 1;
         printf("_dash > ");
         fgets(userInput, MAX_CMD_LEN, stdin);
 
@@ -111,7 +120,7 @@ int main(int argc, char* argv[])
             goto cleanup;
         }
 
-        if(strcmp("pipe", formattedInput) == 0)
+        if(strcmp("ls", formattedInput) == 0)
         {
             if(pipe(pipefd) < 0)
                 ERROR("Can't create pipe!");
@@ -123,22 +132,25 @@ int main(int argc, char* argv[])
         pid = fork();
         if(pid == 0)  // Child Process
         {
-            if(pipeExists != 0)
+            if(pipeExists)
             {
-                dup2(STDOUT_FILENO, pipefd[1]);
+                /* Close read end of pipe */
                 if(close(pipefd[0]) < 0)
+                    ERROR("Child Proc: Can't close write end of pipe!");
+                
+                /* Redirect stdout to write end of pipe */
+                if(dup2(pipefd[1], STDOUT_FILENO) < 0)
+                    ERROR("Dup failed");
+
+                /* Close write end of pipe, don't need it now */
+                if(close(pipefd[1]) < 0)
                     ERROR("Child Proc: Can't close read end of pipe!");
             }
 
+            /* Execute command */
             rc = execvp(cmdargv[0], cmdargv);
             if(rc < 0)
                 printErrorMessage(cmdargv, errno);
-
-            if(pipeExists != 0)
-            {
-                if(close(pipefd[1]) < 0)
-                    ERROR("Child Proc: Can't close write end of pipe!");
-            }
 
             // Child process needs to exit out or else program never exists.
             exit(1);
@@ -152,16 +164,29 @@ int main(int argc, char* argv[])
         }
         else  // Parent Process
         {
-            if(pipeExists != 0)
+            if(pipeExists)
             {
+                /* Close write end of pipe */
                 if(close(pipefd[1]) < 0)
                     ERROR("Parent Proc: Can't close write end of pipe!");
-                
-                while(read(pipefd[0], &buf, 1) == 1)
-                    printf("%c", buf);
-                
-                if(close(pipefd[0]) < 0)
-                    ERROR("Parent Proc: Can't close read end of pipe!");
+
+                if((fd_pipe = fdopen(pipefd[0], "r")) == NULL)
+                    ERROR("Can't open file pointer for pipe!\n");
+
+                /* Read & spit out output from child process */
+                while(fgets(buf, sizeof(buf), fd_pipe) != NULL)
+                {
+                    //printf("Parent %d: %s\n",count, buf);
+                    printf("%s",buf);
+                    //count++;
+                }
+
+                /* Close read end of pipe, don't need it anymore */
+                if(fclose(fd_pipe) != 0)
+                {
+                    perror("DAPH");
+                    ERROR("Can't close file pointer to pipe!\n");
+                }
             }
         }
 
