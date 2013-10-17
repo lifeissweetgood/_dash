@@ -206,7 +206,8 @@ static int execute_fork(char **cmdargv, int pipeExists)
     char *first_cmd = NULL;
     char **first_cmd_args = NULL;
 
-    tmp_argv_len = sizeof(char*) * (array_len(cmdargv) - 1);
+    //tmp_argv_len = sizeof(char*) * (array_len(cmdargv) - 1);
+    tmp_argv_len = sizeof(char*) * MAX_CMD_ARGS;
     if((tmp_cmd_argv = (char**) malloc(tmp_argv_len)) == NULL)
     {
         ERROR("Failed malloc!\n");
@@ -374,7 +375,7 @@ int main(int argc, char* argv[])
         }
 
         // Check to see if user wants to change working directories
-        cdCmd = malloc(strlen(formattedInput));
+        cdCmd = malloc(strlen(formattedInput) + 1);
         if( (cdCmd = strstr(formattedInput, "cd ")) != NULL )
         {
             if(changeDir(cdCmd) != 0)
