@@ -193,8 +193,7 @@ static int array_len(char **array)
 {
     int i = 0;
 
-    for(; array[i] != NULL; i++)
-    {}
+    for(; array[i] != NULL; i++);
 
     return i;
 }
@@ -336,11 +335,11 @@ int main(int argc, char* argv[])
     if((userInput = malloc(sizeof(char)*MAX_CMD_LEN)) == NULL)
         ERROR("Failed malloc\n");
 
-    cmdargv_len = sizeof(char*) * MAX_CMD_ARGS;
+    cmdargv_len = sizeof(char*) * (MAX_CMD_ARGS + 1);
     if((cmdargv = (char**) malloc(cmdargv_len)) == NULL) {
         ERROR("Failed malloc\n");
     } else {
-        memset(cmdargv, '\0', sizeof(char*) * MAX_CMD_ARGS);
+        memset(cmdargv, '\0', cmdargv_len);
     }
 
     registerSignalHandler();
@@ -362,7 +361,7 @@ int main(int argc, char* argv[])
         // TODO: Sanitize user input! We're currently hoping the user is a
         // benelovent, sweet human being. HA!
 
-        formattedInput = malloc(sizeof(userInput));
+        formattedInput = malloc(strlen(userInput)+1);
         removeNewLine(userInput, formattedInput);
 
         // See if user wants out.
@@ -375,12 +374,11 @@ int main(int argc, char* argv[])
         }
 
         // Check to see if user wants to change working directories
+        cdCmd = malloc(strlen(formattedInput));
         if( (cdCmd = strstr(formattedInput, "cd ")) != NULL )
         {
             if(changeDir(cdCmd) != 0)
                 ERROR("cd failed.");
-
-            free(cdCmd);
 
             // No need to fork/exec, can just move on.
             continue;
