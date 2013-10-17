@@ -17,7 +17,7 @@
 #define ERROR(x) if(x) { printf("ERROR: %s\n", x); exit(1); }
 #define ERROR_CLEANUP(x) if(x) { printf("ERROR: %s\n", x); \
                                 rc = -__LINE__; goto cleanup; }
-#define ASSERT(x) if(x) { printf("ASSERT: Assert failed!\n"); \
+#define ASSERT(x) if(!x) { printf("ASSERT: Assert failed!\n"); \
                                 rc = -__LINE__; goto cleanup; }
 
 // Signal received bool
@@ -198,9 +198,60 @@ static int array_len(char **array)
     return i;
 }
 
+int pipe_fd[2];
+
+int init_pipe()
+{
+    int rc = 0;
+    if(pipe(pipe_fd) < 0)
+        ERROR_CLEANUP("Can't make pipe!\n");
+cleanup:
+
+    return rc;
+}
+
+void read_from_pipe(char *buffer)
+{
+    char buf;
+    int counter = 0;
+
+    /* Close write end of pipe */
+    if(close(pipe_fd[1]) < 0)
+        ERROR("Can't close write end of pipe!");
+
+    /* Read & spit out output from child process */
+    while(read(pipe_fd[0], &buf, sizeof(buf)) == 1)
+    {
+        buffer[counter] = buf;
+        counter++;
+    }
+    printf("PARENT: BLAH %s \n\n PARENT BUF finished!", buffer);
+
+    /* Close read end of pipe, don't need it anymore */
+    //if(close(pipe_fd[0]) < 0)
+    //    ERROR("Can't close write end of pipe!");
+}
+
+void child_write_to_pipe()
+{
+    /* Close read end of pipe */
+    if(close(pipe_fd[0]) < 0)
+        ERROR("Child Proc: Can't close read end of pipe!");
+    
+    /* Redirect stdout to write end of pipe */
+    if(dup2(pipe_fd[1], STDOUT_FILENO) < 0)
+        ERROR("Dup failed");
+
+    /* Close write end of pipe, don't need it now */
+    //if(close(pipe_fd[1]) < 0)
+    //    ERROR("Child Proc: Can't close read end of pipe!");
+}
+
 static int execute_fork(char **cmdargv, int pipeExists)
 {
     pid_t pid;
+    char result_buf[4096];
+
     int i = 1, rc = 0, status = 0, tmp_argv_len = 0;
     char **tmp_cmd_argv = NULL;
     char *first_cmd = NULL;
@@ -224,12 +275,16 @@ static int execute_fork(char **cmdargv, int pipeExists)
     pid = fork();
     if(pid == 0)  // Child Process
     {
+        if(pipeExists)
+            child_write_to_pipe(); // Set up pipe for exec environment
+
         printf("%d: In child! Pipe exists = %d\n", __LINE__, pipeExists);
             for(i=0; cmdargv[i] != NULL; i++)
                 printf("%d cmdargv[%d]: %s\n", __LINE__, i, cmdargv[i]);
 
-        // Single command to execute
-        if(!pipeExists)
+        // Base Case: Single command to execute
+        if(array_len(cmdargv) == 1)
+        //if(!pipeExists)
         {
             // Split args for command, if there are any, then execute
             if(strstr(cmdargv[0], " ") != NULL)
@@ -237,6 +292,8 @@ static int execute_fork(char **cmdargv, int pipeExists)
                 first_cmd = strndup(cmdargv[0], strlen(cmdargv[0]));
                 memset(first_cmd_args, '\0', tmp_argv_len);
                 parseUserInput(first_cmd, first_cmd_args);
+            for(i=0; first_cmd_args[i] != NULL; i++)
+                printf("%d first_cmd_args[%d]: %s\n", __LINE__, i, first_cmd_args[i]);
                 if(execvp(first_cmd_args[0], first_cmd_args) < 0)
                     printErrorMessage(first_cmd_args, errno);
             }
@@ -247,8 +304,9 @@ static int execute_fork(char **cmdargv, int pipeExists)
             }
         }
 
-        // There's piping involved and multiple commands
-        // to parse through still
+        // Recursive Case: Need to chain commands
+        //  -There's piping involved and multiple commands
+        //   to parse through still
         printf("%d: In child!\n", __LINE__);
         
         // Split cmdargv into smaller chunk
@@ -272,13 +330,6 @@ static int execute_fork(char **cmdargv, int pipeExists)
         for(i=0; cmdargv[i] != NULL; i++)
             printf("cmdargv[%d]: %s\n", i, cmdargv[i]);
         
-        // Set pipe up
-        
-        // If cmdargv only has 1 element, we have reached the base
-        // case and thus we can treat it like a single command above
-        if(array_len(cmdargv) == 1)
-            pipeExists = 0;
-        
         /* Recursive calls */
         // Call the single command
         if( execute_fork(first_cmd_args, 0) < 0 )
@@ -301,6 +352,13 @@ static int execute_fork(char **cmdargv, int pipeExists)
     else  // Parent Process
     {
         printf("Hello.\n");
+
+        // Read from pipe
+        if(pipeExists)
+        {
+            read_from_pipe(result_buf);
+            printf("PARENT: %s\n", result_buf);
+        }
     }
     
     // Wait on child
@@ -318,14 +376,13 @@ cleanup:
  */
 int main(int argc, char* argv[])
 {
-    int pipefd[2];
     pid_t pid;
 
-    char buf;
-    char result_buf[4096];
+    //char buf;
+    //char result_buf[4096];
 
     int i, cmdargv_len;
-    int rc = 0, counter = 0;
+    int rc = 0/*, counter = 0*/;
     int status = 0;
     int pipeExists = 0;
 
@@ -390,7 +447,7 @@ int main(int argc, char* argv[])
 
         if( (pipe_cmd = strstr(formattedInput, "|")) != NULL )
         {
-            if(pipe(pipefd) < 0)
+            if(init_pipe() < 0)
                 ERROR("Can't create pipe!");
             pipeExists = 1;
             parsePipeInput(formattedInput, cmdargv);
@@ -408,16 +465,16 @@ int main(int argc, char* argv[])
             if(pipeExists)
             {
                 /* Close read end of pipe */
-                if(close(pipefd[0]) < 0)
-                    ERROR("Child Proc: Can't close write end of pipe!");
+                //if(close(pipefd[0]) < 0)
+                //    ERROR("Child Proc: Can't close write end of pipe!");
                 
                 /* Redirect stdout to write end of pipe */
-                if(dup2(pipefd[1], STDOUT_FILENO) < 0)
-                    ERROR("Dup failed");
+                //if(dup2(pipefd[1], STDOUT_FILENO) < 0)
+                //    ERROR("Dup failed");
 
                 /* Close write end of pipe, don't need it now */
-                if(close(pipefd[1]) < 0)
-                    ERROR("Child Proc: Can't close read end of pipe!");
+                //if(close(pipefd[1]) < 0)
+                //    ERROR("Child Proc: Can't close read end of pipe!");
             }
 
             /* Execute command */
@@ -440,20 +497,20 @@ int main(int argc, char* argv[])
             if(pipeExists)
             {
                 /* Close write end of pipe */
-                if(close(pipefd[1]) < 0)
-                    ERROR("Parent Proc: Can't close write end of pipe!");
+                //if(close(pipefd[1]) < 0)
+                //    ERROR("Parent Proc: Can't close write end of pipe!");
 
                 /* Read & spit out output from child process */
-                while(read(pipefd[0], &buf, sizeof(buf)) == 1)
-                {
-                    result_buf[counter] = buf;
-                    counter++;
-                }
-                printf("%s", result_buf);
+                //while(read(pipefd[0], &buf, sizeof(buf)) == 1)
+                //{
+                //    result_buf[counter] = buf;
+                //    counter++;
+                //}
+                //printf("%s", result_buf);
 
                 /* Close read end of pipe, don't need it anymore */
-                if(close(pipefd[0]) < 0)
-                    ERROR("Child Proc: Can't close write end of pipe!");
+                //if(close(pipefd[0]) < 0)
+                //    ERROR("Child Proc: Can't close write end of pipe!");
             }
         }
 
@@ -463,8 +520,8 @@ int main(int argc, char* argv[])
         if(pipeExists)
         {
             // Clear buffer, reset buffer counter
-            memset(result_buf, 0, sizeof(result_buf));
-            counter = 0;
+            //memset(result_buf, 0, sizeof(result_buf));
+            //counter = 0;
         }
 
         // Reset pipe bool
