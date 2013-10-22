@@ -2,13 +2,13 @@ _dash
 ======
 ###A shell written in C
 
-#To Compile
+##To Compile
 $ make
 
-#To Run
+##To Run
 $ ./dash
 
-#To Compile Time Tests
+##To Compile Time Tests
 ### Tests for comparing speed of fgets() vs. speed of read()
 $ make time-tests
 
