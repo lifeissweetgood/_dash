@@ -1,6 +1,5 @@
 CC = gcc
-##CFLAGS = -ggdb3 -Wall -Wextra -pedantic -std=gnu99
-CFLAGS = -ggdb3 -Wextra -pedantic -std=gnu99
+CFLAGS = -ggdb3 -Wall -Wextra -pedantic -std=gnu99
 
 DEPS := debug.h
 DEPS += parser.h
