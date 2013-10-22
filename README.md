@@ -14,4 +14,5 @@ $ make time-tests
 
 ###To Run Time Tests
 $ ./test/dash-read
+
 $ ./test/dash-fgets
