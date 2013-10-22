@@ -2,8 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "parser.h"
-#include "debug.h"
+#include "../include/parser.h"
+#include "../include/debug.h"
 
 /**
  * Grabs commands and args and formats them to pass to child process
