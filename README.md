@@ -1,7 +1,6 @@
 _dash
 ======
-A shell written in C
-------
+###A shell written in C
 
 #To Compile
 $ make
