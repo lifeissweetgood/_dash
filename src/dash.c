@@ -24,6 +24,7 @@ static bool got_sigint = false;
  */
 static void termination_handler(int signum)
 {
+    (void) signum;
     got_sigint = true;
 }
 
@@ -362,4 +363,10 @@ cleanup:
     printf("All finished.\n");
 
     return 0;
+
+    if(0)
+    {
+        (void) argc;
+        (void) argv;
+    }
 }

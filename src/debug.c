@@ -27,7 +27,7 @@ void show_cmd(char **cmd)
  * Displays error message for failed exec call.
  *
  */
-int printErrorMessage(char** args, int code)
+void printErrorMessage(char** args, int code)
 {
     switch(code) {
         case EACCES:

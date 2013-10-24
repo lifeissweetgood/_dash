@@ -11,4 +11,4 @@
                           rc = -__LINE__; goto cleanup; }
 
 void show_cmd(char **cmd);
-int printErrorMessage(char** args, int code);
+void printErrorMessage(char** args, int code);
