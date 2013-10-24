@@ -88,7 +88,7 @@ cleanup:
  */
 int main(int argc, char* argv[])
 {
-    int i, j, cmdargv_len, status;
+    int i, cmdargv_len, status;
     int piperet, pid;
     int rc = 0;
     int pipefd[2];
@@ -98,7 +98,6 @@ int main(int argc, char* argv[])
     char **cmdargv = NULL ;
 
     char *cdCmd = NULL;
-    char *pipeCmd = NULL;
     char ***cmds_to_be_run = NULL;
 
     if((userInput = malloc(sizeof(char)*MAX_CMD_LEN)) == NULL)
@@ -161,27 +160,18 @@ int main(int argc, char* argv[])
         }
 
         parseUserInput(formattedInput, cmdargv);
-        printf("%s %d\n", __func__, __LINE__);
-        show_cmd(cmdargv);
         cmds_to_be_run = parse_commands(cmdargv);
         // TODO: check for error
 
-        printf("%s %d\n", __func__, __LINE__);
-        if (cmds_to_be_run[0])
-            show_cmd(cmds_to_be_run[0]);
-        if (cmds_to_be_run[1])
-            show_cmd(cmds_to_be_run[1]);
-
         if((cmds_to_be_run[1] == NULL) ||
            (cmds_to_be_run[1][0] == NULL)) {
-            printf("caller: The *only* command is:\n");
-            show_cmd(cmds_to_be_run[0]);
-            printf("%s %d\n", __func__, __LINE__);
+            //printf("caller: The *only* command is:\n");
+            //show_cmd(cmds_to_be_run[0]);
             
             /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0], NULL);*/
             rc = run_pipe(pipefd, cmds_to_be_run);
-            //if(rc == -1)
-            //    printf("No commands passed to run_pipe\n");
+            if(rc == -1)
+                printf("No commands passed to run_pipe\n");
         } else {
             piperet = pipe(pipefd);
             if (piperet == -1) {
@@ -189,17 +179,12 @@ int main(int argc, char* argv[])
                 // TODO: handle this
             }
 
-            printf("caller: The *first* command is: ");
-            show_cmd(cmds_to_be_run[0]);
-            printf("%s %d\n", __func__, __LINE__);
-            
             /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0],
              *                     cmds_to_be_run[1]); */
             
             rc = run_pipe(pipefd, cmds_to_be_run);
-
-            //if(rc == -1)
-            //    printf("No commands passed to run_pipe\n");
+            if(rc == -1)
+                printf("No commands passed to run_pipe\n");
             close(pipefd[0]);
             close(pipefd[1]);
             //ASSERT( rc == 0 );
@@ -209,10 +194,10 @@ int main(int argc, char* argv[])
             //fprintf(stderr, "process %d exits with %d\n", pid, WEXITSTATUS(status));
         }
 
-        printf("%s %d: About to show commands to be run\n",
-               __func__, __LINE__);
-        if(cmds_to_be_run)
-            show_cmd_list(cmds_to_be_run);
+        //printf("%s %d: About to show commands to be run\n",
+        //       __func__, __LINE__);
+        //if(cmds_to_be_run)
+        //    show_cmd_list(cmds_to_be_run);
 
         // Free triple star list
         free(cmds_to_be_run);

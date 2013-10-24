@@ -26,7 +26,6 @@ int run_pipe(int pipefd[], char ***cmd_list)
 
     // Handle just 1 command passed
     if((cmd_list[1] == NULL) || (cmd_list[1][0] == NULL)) {
-        printf("%d: Only 1 command present\n", __LINE__);
         cpid1 = fork();
         if(cpid1 == 0) {
             rc = execvp(cmd_list[0][0], cmd_list[0]);
@@ -40,9 +39,9 @@ int run_pipe(int pipefd[], char ***cmd_list)
         {
             cpid2 = fork();
             if (cpid2 == 0) { // set up the reader child
-                printf("kid1 launched, it'll be %s!\n", cmd_list[counter][0]);
-                show_cmd(cmd_list[counter]);
-                printf("%s %d\n",__func__, __LINE__);
+                printf("kid2 launched, it'll be %s!\n", cmd_list[counter][0]);
+                //show_cmd(cmd_list[counter]);
+                //printf("%s %d\n",__func__, __LINE__);
                 
                 close(pipefd[1]);
                 dup2(pipefd[0], STDIN_FILENO);
@@ -56,17 +55,18 @@ int run_pipe(int pipefd[], char ***cmd_list)
             
             cpid1 = fork();
             if (cpid1 == 0) { // set up the writer child
-                printf("kid2 launched!\n");
-                show_cmd(cmd_list[counter - 1]);
-                printf("%s %d\n",__func__, __LINE__);
+                printf("kid1 launched, it'll be %s!\n",
+                       cmd_list[counter -1][0]);
+                //show_cmd(cmd_list[counter - 1]);
+                //printf("%s %d\n",__func__, __LINE__);
                 
                 close(pipefd[0]);
                 dup2(pipefd[1], STDOUT_FILENO);
                 close(pipefd[1]);
                 
-                printf("%s %d cmd_list[0][0] = %s\n",
+                /*printf("%s %d cmd_list[0][0] = %s\n",
                        __func__, __LINE__,
-                       cmd_list[counter - 1][0]);
+                       cmd_list[counter - 1][0]);*/
                 rc = execvp(cmd_list[counter - 1][0],
                             cmd_list[counter - 1]);
                 if(rc < 0)
@@ -80,12 +80,7 @@ int run_pipe(int pipefd[], char ***cmd_list)
         }
     }
 
-    //wait(NULL);
-    //waitpid(-1, &status, 0);
-    //fflush(stdout);
-    //waitpid(cpid1, NULL, NULL);
-    //waitpid(cpid2, NULL, NULL);
-    printf("Yay, kids done\n");
+    //printf("Yay, kids done\n");
     return 0;
 }
 
