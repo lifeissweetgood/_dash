@@ -23,6 +23,30 @@ void show_cmd(char **cmd)
         printf("cmd[%i] = %s\n", i, cmd[i]);
 }
 
+void show_cmd_list(char ***cmd)
+{
+    int i, j;
+
+    if (!cmd)
+    {
+        printf("Cmd is null\n");
+        return;
+    }
+    if (!cmd[0])
+    {
+        printf("Cmd_list array is null\n");
+        return;
+    }
+    if (!cmd[0][0])
+    {
+        printf("Cmd_list's first command set is null\n");
+        return;
+    }
+    for(i = 0; cmd[i] != NULL; i++)
+        for(j = 0;cmd[i][j] != NULL; j++)
+            printf("cmd_list[%i][%i] = %s\n", i, j, cmd[i][j]);
+}
+
 /*
  * Displays error message for failed exec call.
  *

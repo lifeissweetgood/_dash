@@ -111,34 +111,38 @@ char ***parse_commands(char **userInputStr)
     {
         for(i = 0; userInputStr[i] != NULL; i++) {
             tmp = userInputStr[i];
-            printf("%s %d: userInputStr[%i] = tmp -> %s\n", __func__, __LINE__,
-                i, tmp);
-            printf("%s %d: cmd_parts = %d\n", __func__,
-                    __LINE__, command_parts);
+            printf("%s %d: userInputStr[%i] = tmp -> %s\n",
+                   __func__, __LINE__, i, tmp);
             
-            // Case of 1 command
-            //if((userInputStr[0] != NULL) && (userInputStr[1] == NULL))
-            //    command_parts = 1;
-
-            if (((userInputStr[i+1] == NULL)) || ((tmp[0] == '|') && (tmp[1] == '\0')))
+            if (((userInputStr[i+1] == NULL)) ||
+                ((tmp[0] == '|') && (tmp[1] == '\0')))
             {
                 cmdlen = sizeof(char*) * (command_parts+1);
                 command = malloc(cmdlen);
                 // TODO: check for failure
                 memset(command, '\0', cmdlen);
+                
                 // TODO: remove printf("found a command\n");
                 printf("%s %d: cmd_parts = %d\n", __func__,
                     __LINE__, command_parts);
-                for(j = 0; j < command_parts; j++)
+
+                for(j = 0; j < (command_parts + 1); j++)
                 {
-                    printf("%s %d: userInputStr[%d] = %s\n",__func__, __LINE__,
-                        cmd_start + j, userInputStr[cmd_start + j]);
-                    command[j] = strdup(userInputStr[cmd_start + j]);
+                    printf("%s %d: cmd_parts = %d\n", __func__,
+                        __LINE__, command_parts);
+                    printf("%s %d: userInputStr[%d] = %s cmd-start = %d j = %d\n",
+                           __func__, __LINE__,cmd_start + j,
+                           userInputStr[cmd_start + j], cmd_start, j);
+                    
+                    if( strcmp("|", userInputStr[cmd_start + j]) != 0)
+                        command[j] = strdup(userInputStr[cmd_start + j]);
+                    
                     // TODO: remove printf("command[%i] is %s\n", j, command[j]);
-                    printf("%s %d: userinputstrJ[%i] is %s\n", __func__,
-                        __LINE__, j, userInputStr[j]);
+                    printf("%s %d: userinputstrJ[%i] is %s\n",
+                           __func__, __LINE__, j, userInputStr[j]);
                     printf("%s %d: userinputstr_cmd-start+J[%i] is %s\n",
-                        __func__, __LINE__, j, userInputStr[cmd_start + j]);
+                           __func__, __LINE__,
+                           j, userInputStr[cmd_start + j]);
                     printf("%s %d: command[%i] is %s\n", __func__,
                         __LINE__, j, command[j]);
                 }
@@ -146,29 +150,32 @@ char ***parse_commands(char **userInputStr)
                 cmd_start = i + 1;
                 cmds_to_be_run[cmdi] = command;
                 cmdi += 1;
+                command_parts = 0;
                 printf("%s %d\n",__func__, __LINE__);
                 show_cmd(command);
                 printf("%s %d\n",__func__, __LINE__);
-                // TODO: remove show_cmd(command);
-            }
-            else if(userInputStr[i] == '\0')
-            {
+                show_cmd_list(cmds_to_be_run);
                 printf("%s %d\n",__func__, __LINE__);
-                break;
+                // TODO: remove show_cmd(command);
             }
             else
             {
-                printf("%s %d\n",__func__, __LINE__);
-                printf("%s %d: userinputstr_i[%i] is %s\n", __func__, __LINE__, i, userInputStr[i]);
-                //printf("%s %d: userinputstr = %s\n", __func__, __LINE__, userInputStr);
+                printf("%s %d: BEFORE incrementing cmd_parts = %d\n",
+                       __func__, __LINE__, command_parts);
+                printf("%s %d: userinputstr_i[%i] is %s\n",
+                       __func__, __LINE__, i, userInputStr[i]);
+                //printf("%s %d: userinputstr = %s\n",
+                //       __func__, __LINE__, userInputStr);
+
                 // TODO: remove show_cmd(command);
-                printf("%s %d: cmd_parts = %d\n", __func__,
-                    __LINE__, command_parts);
                 command_parts += 1;
-                printf("%s %d: cmd_parts = %d\n", __func__,
-                    __LINE__, command_parts);
+                printf("%s %d: AFTER incrementing cmd_parts = %d\n",
+                       __func__, __LINE__, command_parts);
             }
         }
+        printf("%s %d\n",__func__, __LINE__);
+        show_cmd_list(cmds_to_be_run);
+        printf("%s %d\n",__func__, __LINE__);
     }
     printf("done\n");
     return cmds_to_be_run;

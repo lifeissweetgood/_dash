@@ -127,6 +127,11 @@ int main(int argc, char* argv[])
             }
         }
 
+        // Check for empty input
+        if(!userInput || (strcmp("", userInput) == 0)
+           || (userInput[0] == '\n'))
+            continue;
+
         // TODO: Sanitize user input! We're currently hoping the user is a
         // benelovent, sweet human being. HA!
 
@@ -166,12 +171,15 @@ int main(int argc, char* argv[])
             show_cmd(cmds_to_be_run[0]);
         if (cmds_to_be_run[1])
             show_cmd(cmds_to_be_run[1]);
+
         if((cmds_to_be_run[1] == NULL) ||
            (cmds_to_be_run[1][0] == NULL)) {
             printf("caller: The *only* command is:\n");
             show_cmd(cmds_to_be_run[0]);
             printf("%s %d\n", __func__, __LINE__);
-            rc = run_pipe(pipefd, cmds_to_be_run[0], NULL);
+            
+            /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0], NULL);*/
+            rc = run_pipe(pipefd, cmds_to_be_run);
             //if(rc == -1)
             //    printf("No commands passed to run_pipe\n");
         } else {
@@ -184,7 +192,12 @@ int main(int argc, char* argv[])
             printf("caller: The *first* command is: ");
             show_cmd(cmds_to_be_run[0]);
             printf("%s %d\n", __func__, __LINE__);
-            rc = run_pipe(pipefd, cmds_to_be_run[0], cmds_to_be_run[1]);
+            
+            /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0],
+             *                     cmds_to_be_run[1]); */
+            
+            rc = run_pipe(pipefd, cmds_to_be_run);
+
             //if(rc == -1)
             //    printf("No commands passed to run_pipe\n");
             close(pipefd[0]);
@@ -196,16 +209,15 @@ int main(int argc, char* argv[])
             //fprintf(stderr, "process %d exits with %d\n", pid, WEXITSTATUS(status));
         }
 
-        for(i=0; i< 2; i++) {
-            if (cmds_to_be_run[i]) {
-                for (j = 0; cmds_to_be_run[i][j] != NULL; j++) {
-                    free(cmds_to_be_run[i][j]); /* free(NULL) is ok with glibc */
-                }
-            }
-            free(cmds_to_be_run[i]);
-        }
+        printf("%s %d: About to show commands to be run\n",
+               __func__, __LINE__);
+        if(cmds_to_be_run)
+            show_cmd_list(cmds_to_be_run);
+
+        // Free triple star list
         free(cmds_to_be_run);
 
+        // Free list of command strings
         if (cmdargv) {
             for (i = 0; i < MAX_CMD_ARGS; i++) {
                 free(cmdargv[i]); /* free(NULL) is ok with glibc */
