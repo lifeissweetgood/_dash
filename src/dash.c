@@ -191,9 +191,12 @@ cleanup:
  */
 int main(int argc, char* argv[])
 {
-    int i, j, cmdargv_len;
+    int i, j, cmdargv_len, status;
+    int piperet, pid;
     int rc = 0;
     int pipeExists = 0;
+    int pipefd[2];
+    //int count = 0;
 
     char *formattedInput = NULL;
     char *userInput = NULL;
@@ -206,22 +209,31 @@ int main(int argc, char* argv[])
     if((userInput = malloc(sizeof(char)*MAX_CMD_LEN)) == NULL)
         ERROR("Failed malloc\n");
 
-    cmdargv_len = sizeof(char*) * MAX_CMD_ARGS;
-    if((cmdargv = (char**) malloc(cmdargv_len)) == NULL) {
-        ERROR("Failed malloc\n");
-    } else {
-        memset(cmdargv, '\0', sizeof(char*) * MAX_CMD_ARGS);
-    }
-
     registerSignalHandler();
 
     while(1)
     {
+        cmdargv_len = sizeof(char*) * MAX_CMD_ARGS;
+        if((cmdargv = (char**) malloc(cmdargv_len)) == NULL) {
+            ERROR("Failed malloc\n");
+        } else {
+            memset(cmdargv, '\0', sizeof(char*) * MAX_CMD_ARGS);
+        }
+
+        /*printf("Beginning loop %d\n", __LINE__);
+        if( count > 0)
+        {
+            if (commands[0])
+                show_cmd(commands[0]);
+            if (commands[1])
+                show_cmd(commands[1]);
+        }*/
+
         printf("_dash > ");
         got_sigint = false;
         if (fgets(userInput, MAX_CMD_LEN, stdin) == NULL) {
             if (got_sigint) {
-              printf("\n");
+              printf("\tIt's handled.\n");
               continue;
             } else {
               // Ctrl+D
@@ -269,22 +281,71 @@ int main(int argc, char* argv[])
         }
 
         parseUserInput(formattedInput, cmdargv);
+        printf("%s %d\n", __func__, __LINE__);
+        show_cmd(cmdargv);
         commands = parse_commands(cmdargv);
         // TODO: check for error
 
         //for(j=0; cmdargv[j] != NULL; j++)
         //    printf("%d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
 
-        //rc = execute_fork(cmdargv, pipeExists);
-        printf("caller: first command is:\n");
-        show_cmd(commands[0]);
-        printf("%d\n", __LINE__);
-        rc = run_pipe(commands[0], commands[1]);
-        if(rc == -1)
-            printf("No commands passed to run_pipe\n");
-        //ASSERT( rc == 0 );
+        printf("%s %d\n", __func__, __LINE__);
+        if (commands[0])
+            show_cmd(commands[0]);
+        if (commands[1])
+            show_cmd(commands[1]);
+        if((commands[1] == NULL) || (commands[1][0] == NULL))
+        {
+            printf("caller: The *only* command is:\n");
+            show_cmd(commands[0]);
+            printf("%s %d\n", __func__, __LINE__);
+            rc = run_pipe(pipefd, commands[0], NULL);
+            //if(rc == -1)
+            //    printf("No commands passed to run_pipe\n");
+        }
+        else
+        {
+            piperet = pipe(pipefd);
+            if (piperet == -1) {
+                printf("Piping problems\n");
+                // TODO: handle this
+            }
+
+            //rc = execute_fork(cmdargv, pipeExists);
+            printf("caller: The *first* command is:\n");
+            show_cmd(commands[0]);
+            printf("%s %d\n", __func__, __LINE__);
+            rc = run_pipe(pipefd, commands[0], commands[1]);
+            //if(rc == -1)
+            //    printf("No commands passed to run_pipe\n");
+            close(pipefd[0]);
+            close(pipefd[1]);
+            //ASSERT( rc == 0 );
+        }
+
+        while((pid = wait(&status)) != -1)
+        {
+            //fprintf(stderr, "process %d exits with %d\n", pid, WEXITSTATUS(status));
+        }
+        //count++;
+        for(i=0; i< 2; i++)
+        {
+            if (commands[i]) {
+                for (j = 0; commands[i][j] != NULL; j++) {
+                    free(commands[i][j]); /* free(NULL) is ok with glibc */
+                }
+            }
+            free(commands[i]);
+        }
+        free(commands);
 
         pipeExists = 0;
+        if (cmdargv) {
+            for (i = 0; i < MAX_CMD_ARGS; i++) {
+                free(cmdargv[i]); /* free(NULL) is ok with glibc */
+            }
+        }
+        free(cmdargv);
     }
 
 /* Cleanup! */
