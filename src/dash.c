@@ -83,110 +83,6 @@ cleanup:
 
 
 /**
- * Executes the fork
- */
-int execute_fork(char **cmdargv, int pipeExists)
-{
-    char buf;
-    int pipefd[2];
-    pid_t pid;
-
-    int j;
-    int i = 0, cursor = 0, rc = 0, status = 0;
-
-    char **subCmdArgv = NULL;
-
-    while(cmdargv[cursor] != NULL)
-    {
-        for(j=0; cmdargv[j] != NULL; j++)
-            ;//printf("CHECKINGCHECKING %d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
-        if(pipeExists)
-        {
-            if(pipe(pipefd) < 0)
-                ERROR("Can't create pipe!");
-        }    
-
-        if((subCmdArgv = (char**) malloc(sizeof(char*) * j)) == NULL)
-            ERROR("Failed malloc!\n");
-
-        //for(j=0; cmdargv[j] != NULL; j++)
-            //printf("CHECKINGCHECKING %d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
-
-        // Parse out each command separated by a | (pipe)
-        for(i = 0; cmdargv[i+cursor] != NULL; i++)
-        {
-            if(strcmp("|", cmdargv[i+cursor]) == 0)
-                break;
-            subCmdArgv[i] = strdup(cmdargv[i+cursor]);
-        }
-
-        cursor += (i+1); // holds the next position in cmdargv after the |
-
-        pid = fork();
-        if(pid == 0)  // Child Process
-        {
-            if(pipeExists)
-            {
-                dup2(STDOUT_FILENO, pipefd[1]);
-                if(close(pipefd[0]) < 0)
-                    ERROR("Child Proc: Can't close read end of pipe!");
-            }
-
-            rc = execvp(subCmdArgv[0], subCmdArgv);
-            if(rc < 0)
-                printErrorMessage(cmdargv, errno);
-
-            if(pipeExists)
-            {
-                if(close(pipefd[1]) < 0)
-                    ERROR("Child Proc: Can't close write end of pipe!");
-            }
-
-            // Child process needs to exit out or else program never exists.
-            exit(1);
-        }
-        else if( pid < 0)  // Fork failed. Boo.
-        {
-            ERROR_CLEANUP("Fork failed\n");
-        }
-        else  // Parent Process
-        {
-            if(pipeExists)
-            {
-                if(close(pipefd[1]) < 0)
-                    ERROR_CLEANUP("Parent Proc: Can't close write end of pipe!");
-                
-                while(read(pipefd[0], &buf, 1) == 1)
-                    printf("%c", buf);
-                
-                if(close(pipefd[0]) < 0)
-                    ERROR_CLEANUP("Parent Proc: Can't close read end of pipe!");
-            }
-        }
-        
-        // Wait on child process
-        waitpid(pid, &status, 0);
-
-        // Since we did a strdup above for each command arg, we have to free it
-        // before getting the next set of commands.
-        for(j=0; subCmdArgv[j] != NULL; j++)
-        {
-            printf("subcmdargv[%d]: %s\n", j, subCmdArgv[j]);
-            free(subCmdArgv[j]);
-            subCmdArgv[j] = NULL;
-        }
-
-    } // end while loop
-
-cleanup:
-    free(subCmdArgv);
-    subCmdArgv = NULL;
-
-    return rc;
-}
-
-
-/**
  * Main function
  *
  */
@@ -195,9 +91,7 @@ int main(int argc, char* argv[])
     int i, j, cmdargv_len, status;
     int piperet, pid;
     int rc = 0;
-    int pipeExists = 0;
     int pipefd[2];
-    //int count = 0;
 
     char *formattedInput = NULL;
     char *userInput = NULL;
@@ -205,7 +99,7 @@ int main(int argc, char* argv[])
 
     char *cdCmd = NULL;
     char *pipeCmd = NULL;
-    char ***commands = NULL;
+    char ***cmds_to_be_run = NULL;
 
     if((userInput = malloc(sizeof(char)*MAX_CMD_LEN)) == NULL)
         ERROR("Failed malloc\n");
@@ -221,15 +115,6 @@ int main(int argc, char* argv[])
             memset(cmdargv, '\0', sizeof(char*) * MAX_CMD_ARGS);
         }
 
-        /*printf("Beginning loop %d\n", __LINE__);
-        if( count > 0)
-        {
-            if (commands[0])
-                show_cmd(commands[0]);
-            if (commands[1])
-                show_cmd(commands[1]);
-        }*/
-
         printf("_dash > ");
         got_sigint = false;
         if (fgets(userInput, MAX_CMD_LEN, stdin) == NULL) {
@@ -241,7 +126,6 @@ int main(int argc, char* argv[])
               return 0;
             }
         }
-
 
         // TODO: Sanitize user input! We're currently hoping the user is a
         // benelovent, sweet human being. HA!
@@ -271,36 +155,23 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        // Check to see if user wants to pipe commands
-        if( (pipeCmd = strstr(formattedInput, "|")) != NULL )
-        {
-            pipeExists = 1;
-
-            // Don't need to free pipeCmd bc freeing formattedInput will take
-            // care of that for us.
-            //free(pipeCmd);
-        }
-
         parseUserInput(formattedInput, cmdargv);
         printf("%s %d\n", __func__, __LINE__);
         show_cmd(cmdargv);
-        commands = parse_commands(cmdargv);
+        cmds_to_be_run = parse_commands(cmdargv);
         // TODO: check for error
 
-        //for(j=0; cmdargv[j] != NULL; j++)
-        //    printf("%d: cmdargv[%d]: %s\n", __LINE__, j, cmdargv[j]);
-
         printf("%s %d\n", __func__, __LINE__);
-        if (commands[0])
-            show_cmd(commands[0]);
-        if (commands[1])
-            show_cmd(commands[1]);
-        if((commands[1] == NULL) || (commands[1][0] == NULL))
+        if (cmds_to_be_run[0])
+            show_cmd(cmds_to_be_run[0]);
+        if (cmds_to_be_run[1])
+            show_cmd(cmds_to_be_run[1]);
+        if((cmds_to_be_run[1] == NULL) || (cmds_to_be_run[1][0] == NULL))
         {
             printf("caller: The *only* command is:\n");
-            show_cmd(commands[0]);
+            show_cmd(cmds_to_be_run[0]);
             printf("%s %d\n", __func__, __LINE__);
-            rc = run_pipe(pipefd, commands[0], NULL);
+            rc = run_pipe(pipefd, cmds_to_be_run[0], NULL);
             //if(rc == -1)
             //    printf("No commands passed to run_pipe\n");
         }
@@ -312,11 +183,10 @@ int main(int argc, char* argv[])
                 // TODO: handle this
             }
 
-            //rc = execute_fork(cmdargv, pipeExists);
-            printf("caller: The *first* command is:\n");
-            show_cmd(commands[0]);
+            printf("caller: The *first* command is: ");
+            show_cmd(cmds_to_be_run[0]);
             printf("%s %d\n", __func__, __LINE__);
-            rc = run_pipe(pipefd, commands[0], commands[1]);
+            rc = run_pipe(pipefd, cmds_to_be_run[0], cmds_to_be_run[1]);
             //if(rc == -1)
             //    printf("No commands passed to run_pipe\n");
             close(pipefd[0]);
@@ -331,16 +201,15 @@ int main(int argc, char* argv[])
         //count++;
         for(i=0; i< 2; i++)
         {
-            if (commands[i]) {
-                for (j = 0; commands[i][j] != NULL; j++) {
-                    free(commands[i][j]); /* free(NULL) is ok with glibc */
+            if (cmds_to_be_run[i]) {
+                for (j = 0; cmds_to_be_run[i][j] != NULL; j++) {
+                    free(cmds_to_be_run[i][j]); /* free(NULL) is ok with glibc */
                 }
             }
-            free(commands[i]);
+            free(cmds_to_be_run[i]);
         }
-        free(commands);
+        free(cmds_to_be_run);
 
-        pipeExists = 0;
         if (cmdargv) {
             for (i = 0; i < MAX_CMD_ARGS; i++) {
                 free(cmdargv[i]); /* free(NULL) is ok with glibc */

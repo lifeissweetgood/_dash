@@ -24,7 +24,7 @@ void parseUserInput(const char *userInputStr, char **storeArgs)
                 if (storeArgs[arg] == NULL)
                     ERROR("Failed malloc!\n");
                 storeArgs[arg][cur_string_len] = '\0';
-                printf("storeArgs[%d] = %s\n", arg, storeArgs[arg]);
+                //printf("storeArgs[%d] = %s\n", arg, storeArgs[arg]);
                 
                 arg += 1;
                 cur_string_len = 0;
@@ -54,7 +54,7 @@ int num_pipes(char **userInputStr)
     int i = 0, total_num_pipes = 0;
     const char *tmp = NULL;
 
-    for (i = 0; userInputStr[i] != NULL; i++) {
+    for(; userInputStr[i] != NULL; i++) {
         tmp = userInputStr[i];
         if (tmp && (tmp[0] == '|') && (tmp[1] == '\0'))
             total_num_pipes += 1;
@@ -67,25 +67,24 @@ int num_pipes(char **userInputStr)
 and shares the actual string data with it */
 char ***parse_commands(char **userInputStr)
 {
-    int i = 0, array_len = 0;
-    int j, cmdlen, cmd_start;
-    int pipes = 0;
-    int cmdi = 0;
-    int command_parts = 0;
+    int i, j, pipes, array_len,
+        cmdlen = 0, cmd_start = 0,
+        cmdi = 0, command_parts = 0;
+
     const char *tmp = NULL;
     char **command = NULL;
     char ***cmds_to_be_run = NULL;
 
+    // Use number of pipes to determine how many commands need to be executed
     pipes = num_pipes(userInputStr);
 
+    // Allocate enough space to accomodate the number of commands that need to
+    // be run
     cmdlen = sizeof(char*) * (pipes + 1);
-    cmds_to_be_run = malloc(cmdlen);
-    // TODO: check for failure
+    if( (cmds_to_be_run = malloc(cmdlen)) == NULL)
+        ERROR("Malloc cmds_to_be_run failed!");
     memset(cmds_to_be_run, '\0', cmdlen);
 
-    printf("%s %d: got here\n", __func__, __LINE__);
-    cmd_start = 0;
-    
     if( pipes == 0 )    // Single command with args, no pipes
     {
         // Allocating space for command to go into bigger cmds_to_be_run array
