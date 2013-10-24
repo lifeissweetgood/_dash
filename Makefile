@@ -17,7 +17,7 @@ OBJS += $(BIN_DIR)/parser.o
 OBJS += $(BIN_DIR)/communicator.o
 
 $(BIN_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
-	$(CC) $(CFLAGS) -c -o $@ $<
+	@$(CC) $(CFLAGS) -c -o $@ $<
 
 dash: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
@@ -27,4 +27,4 @@ time-test:
 	$(CC) -o dash-fgets $(TEST_DIR)/dash_fgets_time.c
 
 clean:
-	rm dash $(BIN_DIR)/*
+	@rm -f dash $(BIN_DIR)/*
