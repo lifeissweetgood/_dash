@@ -13,7 +13,7 @@
 int run_pipe(int pipefd[], char **cmd1, char **cmd2)
 {
     int cpid1, cpid2;
-    int rc;
+    int rc = 0;
 
     printf("show 1\n");
     show_cmd(cmd1);
@@ -39,8 +39,8 @@ int run_pipe(int pipefd[], char **cmd1, char **cmd2)
             printf("kid1 launched, it'll be %s!\n", cmd2[0]);
             show_cmd(cmd2);
             printf("%d\n", __LINE__);
+            
             close(pipefd[1]);
-            //fflush(stdin);
             dup2(pipefd[0], STDIN_FILENO);
             close(pipefd[0]);
 
@@ -52,8 +52,8 @@ int run_pipe(int pipefd[], char **cmd1, char **cmd2)
         cpid2 = fork();
         if (cpid2 == 0) { // set up the writer child
             printf("kid2 launched!\n");
+            
             close(pipefd[0]);
-            //fflush(stdout);
             dup2(pipefd[1], STDOUT_FILENO);
             close(pipefd[1]);
             

@@ -166,17 +166,15 @@ int main(int argc, char* argv[])
             show_cmd(cmds_to_be_run[0]);
         if (cmds_to_be_run[1])
             show_cmd(cmds_to_be_run[1]);
-        if((cmds_to_be_run[1] == NULL) || (cmds_to_be_run[1][0] == NULL))
-        {
+        if((cmds_to_be_run[1] == NULL) ||
+           (cmds_to_be_run[1][0] == NULL)) {
             printf("caller: The *only* command is:\n");
             show_cmd(cmds_to_be_run[0]);
             printf("%s %d\n", __func__, __LINE__);
             rc = run_pipe(pipefd, cmds_to_be_run[0], NULL);
             //if(rc == -1)
             //    printf("No commands passed to run_pipe\n");
-        }
-        else
-        {
+        } else {
             piperet = pipe(pipefd);
             if (piperet == -1) {
                 printf("Piping problems\n");
@@ -194,13 +192,11 @@ int main(int argc, char* argv[])
             //ASSERT( rc == 0 );
         }
 
-        while((pid = wait(&status)) != -1)
-        {
+        while((pid = wait(&status)) != -1) {
             //fprintf(stderr, "process %d exits with %d\n", pid, WEXITSTATUS(status));
         }
-        //count++;
-        for(i=0; i< 2; i++)
-        {
+
+        for(i=0; i< 2; i++) {
             if (cmds_to_be_run[i]) {
                 for (j = 0; cmds_to_be_run[i][j] != NULL; j++) {
                     free(cmds_to_be_run[i][j]); /* free(NULL) is ok with glibc */
