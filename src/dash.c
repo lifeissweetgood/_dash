@@ -15,6 +15,7 @@
 
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 100
+#define MAX_NUM_PIPES 10
 
 static bool got_sigint = false;
 
@@ -89,9 +90,9 @@ cleanup:
 int main(int argc, char* argv[])
 {
     int i, cmdargv_len, status;
-    int piperet, pid;
+    int piperet, pid, pipes_num;
     int rc = 0;
-    int pipefd[2];
+    int pipefd[MAX_NUM_PIPES*2];
 
     char *formattedInput = NULL;
     char *userInput = NULL;
@@ -173,10 +174,13 @@ int main(int argc, char* argv[])
             if(rc == -1)
                 printf("No commands passed to run_pipe\n");
         } else {
-            piperet = pipe(pipefd);
-            if (piperet == -1) {
-                printf("Piping problems\n");
-                // TODO: handle this
+            pipes_num = num_pipes(cmdargv);
+            for(i=0; i < pipes_num; i++) {
+                piperet = pipe(pipefd + (i * 2));
+                if (piperet == -1) {
+                    printf("Piping problems\n");
+                    // TODO: handle this
+                }
             }
 
             /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0],
@@ -185,9 +189,12 @@ int main(int argc, char* argv[])
             rc = run_pipe(pipefd, cmds_to_be_run);
             if(rc == -1)
                 printf("No commands passed to run_pipe\n");
-            close(pipefd[0]);
-            close(pipefd[1]);
             //ASSERT( rc == 0 );
+            
+            //close(pipefd[0]);
+            //close(pipefd[1]);
+            for(i=0; i < pipes_num; i++)
+                close(pipefd[i]);
         }
 
         while((pid = wait(&status)) != -1) {
