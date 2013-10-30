@@ -66,4 +66,22 @@ void printErrorMessage(char** args, int code)
     }
 }
 
+/*
+ * Displays error message for general failed call.
+ *
+ */
+void printStrErrorMessage(char* msg, int code)
+{
+    switch(code) {
+        case EACCES:
+            printf("Permission DENIED: %s\n", msg);
+            break;
+        case ENOENT:
+            printf("Command not found: %s\n", msg);
+            break;
+        default:
+            printf("Something bad happened. Error code %d\n", code);
+            printf("%s\n", msg);
+    }
+}
 

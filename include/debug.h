@@ -13,3 +13,4 @@
 void show_cmd(char **cmd);
 void show_cmd_list(char ***cmd);
 void printErrorMessage(char** args, int code);
+void printStrErrorMessage(char* msg, int code);

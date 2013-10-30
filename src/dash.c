@@ -176,7 +176,7 @@ int main(int argc, char* argv[])
         } else {
             // Need to make sure this never goes over MAX_NUM_PIPES
             pipes_num = num_pipes(cmdargv);
-            for(i=0; i < pipes_num; i++) {
+            for(i=0; i < (pipes_num * 2); i++) {
                 piperet = pipe(pipefd + (i * 2));
                 if (piperet == -1) {
                     printf("Piping problems\n");
@@ -208,7 +208,7 @@ int main(int argc, char* argv[])
         //    show_cmd_list(cmds_to_be_run);
 
         // Free triple star list
-        free(cmds_to_be_run);
+        //free(cmds_to_be_run);
 
         // Free list of command strings
         if (cmdargv) {

@@ -53,7 +53,8 @@ int three_d_array_len(char ***three_d_array)
 {
     int i = 0;
 
-    for(; three_d_array[i] != NULL; i++);
+    for(; three_d_array[i] != NULL; i++)
+        printf("3d_array[%d] = %s\n", i, three_d_array[i][0]);
 
     return i;
 }
@@ -179,6 +180,7 @@ char ***parse_commands(char **userInputStr)
                 /*printf("%s %d: AFTER incrementing cmd_parts = %d\n",
                        __func__, __LINE__, command_parts);*/
             }
+            cmds_to_be_run[cmdi] = NULL;
         }
         /*printf("%s %d\n",__func__, __LINE__);
         show_cmd_list(cmds_to_be_run);
