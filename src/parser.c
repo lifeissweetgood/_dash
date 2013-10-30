@@ -49,6 +49,15 @@ int two_d_array_len(char **two_d_array)
     return i;
 }
 
+int three_d_array_len(char ***three_d_array)
+{
+    int i = 0;
+
+    for(; three_d_array[i] != NULL; i++);
+
+    return i;
+}
+
 int num_pipes(char **userInputStr)
 {
     int i = 0, total_num_pipes = 0;

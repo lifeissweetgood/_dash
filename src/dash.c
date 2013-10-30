@@ -15,7 +15,7 @@
 
 #define MAX_CMD_LEN 1000
 #define MAX_CMD_ARGS 100
-#define MAX_NUM_PIPES 10
+#define MAX_NUM_PIPES 5
 
 static bool got_sigint = false;
 
@@ -170,10 +170,11 @@ int main(int argc, char* argv[])
             //show_cmd(cmds_to_be_run[0]);
             
             /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0], NULL);*/
-            rc = run_pipe(pipefd, cmds_to_be_run);
+            rc = run_pipe(pipefd, 0, cmds_to_be_run);
             if(rc == -1)
                 printf("No commands passed to run_pipe\n");
         } else {
+            // Need to make sure this never goes over MAX_NUM_PIPES
             pipes_num = num_pipes(cmdargv);
             for(i=0; i < pipes_num; i++) {
                 piperet = pipe(pipefd + (i * 2));
@@ -186,7 +187,7 @@ int main(int argc, char* argv[])
             /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0],
              *                     cmds_to_be_run[1]); */
             
-            rc = run_pipe(pipefd, cmds_to_be_run);
+            rc = run_pipe(pipefd, pipes_num, cmds_to_be_run);
             if(rc == -1)
                 printf("No commands passed to run_pipe\n");
             //ASSERT( rc == 0 );

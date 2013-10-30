@@ -10,86 +10,75 @@
 #include "../include/parser.h"
 #include "../include/communicator.h"
 
-/**
- * Writer child
- *
- * @returns pid
- */
-int write_child(int pipe_fd[], char **command)
+void close_pipes(int pipefd[], int num_pipes)
 {
-    int cpid = fork();
-
-    if( cpid == 0 ) {
-        printf("Writer child launched with command %s!\n", command[0]);
-
-        close(pipe_fd[0]);
-        dup2(pipe_fd[1], STDOUT_FILENO);
-        close(pipe_fd[1]);
-
-        if( execvp(command[0], command) < 0)
-            printErrorMessage(command, errno);
-    }
-
-    return cpid;
+    int i = 0;
+    for(; i < num_pipes*2; i++)
+        close(pipefd[i]);
 }
 
-/**
- * Reader Child
- *
- * @returns pid
- */
-int read_child(int pipe_fd[], char **command, int execute)
+int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
 {
-    int cpid = fork();
+    int /*fd_counter, cmd_counter,*/ cmd_list_len, pipe_fd_total;
+    int cpid1, /*cpid2,*/ cpid3;
 
-    if( cpid == 0 ) {
-        printf("Reader child launched\n");
-
-        close(pipe_fd[1]);
-        dup2(pipe_fd[0], STDIN_FILENO);
-        close(pipe_fd[0]);
-
-        if( execute && (command != NULL) ) {
-            printf("Reader child executing command %s!\n", command[0]);
-            if( execvp(command[0], command) < 0)
-                printErrorMessage(command, errno);
-        }
-    }
-
-    return cpid;
-}
-
-int run_pipe(int pipefd[], char ***cmd_list)
-{
-    int cpid1, cpid2, cpid3, cpid4;
+    cmd_list_len = three_d_array_len(cmd_list);
 
     // Need at least 1 command.
     if( cmd_list[0] == NULL ) return -1;
 
     // Handle just 1 command passed
-    if((cmd_list[1] == NULL) || (cmd_list[1][0] == NULL)) {
+    if(pipes_num == 0)
+    {
         cpid1 = fork();
-        if(cpid1 == 0) {
+        if(cpid1 == 0)
+        {
             if(execvp(cmd_list[0][0], cmd_list[0]) < 0)
                 printErrorMessage(cmd_list[0], errno);
             _exit(EXIT_SUCCESS);  
         }
-    } else { // Handle piping
-        //cpid4 = read_child(pipefd, NULL, 0);
-        //cpid3 = read_child(pipefd, cmd_list[2], 1);
-        //close(pipefd[0]);
-        //close(pipefd[1]);
-        //pipefd += 2;
-        cpid2 = read_child(pipefd, cmd_list[1], 1);
-        cpid1 = write_child(pipefd, cmd_list[0]);
-        close(pipefd[0]);
-        close(pipefd[1]);
+    }
+    else // Handle piping
+    {
+        // First child, always executes first command regardless of
+        // number of pipes
+        cpid1 = fork();
+        if(cpid1 == 0)
+        {
+            printf("Child 0 launched with command %s\n", cmd_list[0][0]);
 
-        if((cpid1 == -1) || (cpid2 == -1)) {
-           //|| (cpid3 == -1)) {  //|| (cpid4 == -1)) {
-            // TODO: handle this
+            dup2(pipefd[1], STDOUT_FILENO);
+            close_pipes(pipefd, pipes_num);
+
+            if( execvp(cmd_list[0][0], cmd_list[0]) < 0)
+                printErrorMessage(cmd_list[0], errno);
+        }
+
+        // Middle child[ren]
+        // If cmd_list > 2, then multiple pipes are in order.
+        if(cmd_list_len > 2)
+        {
+            
+        
+        }
+        
+        // Last child, executed regardless of num of pipes
+        cpid3 = fork();
+        if(cpid3 == 0)
+        {
+            printf("Child 1 launched with command %s\n", cmd_list[1][0]);
+            
+            pipe_fd_total = (pipes_num*2);
+
+            dup2(pipefd[pipe_fd_total - 2], STDIN_FILENO);
+            close_pipes(pipefd, pipes_num);
+
+            if( execvp(cmd_list[1][0], cmd_list[1]) < 0)
+                printErrorMessage(cmd_list[1], errno);
         }
     }
+
+    close_pipes(pipefd, pipes_num);
 
     return 0;
 }
