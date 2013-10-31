@@ -58,7 +58,7 @@ void printErrorMessage(char** args, int code)
             printf("Permission DENIED: %s\n", args[0]);
             break;
         case ENOENT:
-            printf("Command not found: %s\n", args[0]);
+            printf("Command not found: %s, errno = %d\n", args[0], errno);
             break;
         default:
             printf("Something bad happened. Error code %d\n", code);
