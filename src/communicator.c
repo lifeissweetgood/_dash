@@ -50,8 +50,8 @@ int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
             printf("Child 0 launched with command %s\n", cmd_list[0][0]);
 
             if(dup2(pipefd[1], STDOUT_FILENO) < 0)
-                fprintf(stderr, "%d: CHILD 0: Dup failed! errno = %d",
-                        __LINE__, errno);
+                printStdErrMessage(__func__, __LINE__,
+                                   "CHILD 0: Dup failed!", errno);
             close_pipes(pipefd, pipes_num);
 
             if( execvp(cmd_list[0][0], cmd_list[0]) < 0)
@@ -68,13 +68,11 @@ int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
             {
                 printf("Child 2 launched with command %s\n", cmd_list[1][0]);
                 if(dup2(pipefd[0], STDIN_FILENO) < 0)
-                    fprintf(stderr,
-                            "%d: CHILD 2: Dup STDIN failed! errno = %d",
-                            __LINE__, errno);
+                    printStdErrMessage(__func__, __LINE__,
+                                       "CHILD 2: Dup STDIN failed!", errno);
                 if(dup2(pipefd[3], STDOUT_FILENO) < 0)
-                    fprintf(stderr,
-                            "%d: CHILD 2: Dup STDOUT failed! errno = %d",
-                            __LINE__, errno);
+                    printStdErrMessage(__func__, __LINE__,
+                                       "CHILD 2: Dup STDOUT failed!", errno);
                 close_pipes(pipefd, pipes_num);
 
                 if( execvp(cmd_list[1][0], cmd_list[1]) < 0)
@@ -96,9 +94,8 @@ int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
             pipe_fd_total = (pipes_num*2);
 
             if(dup2(pipefd[pipe_fd_total - 2], STDIN_FILENO) < 0)
-                fprintf(stderr,
-                        "%d: CHILD 1: Dup STDIN failed! errno = %d",
-                        __LINE__, errno);
+                printStdErrMessage(__func__, __LINE__,
+                                   "CHILD 1: Dup STDIN failed!", errno);
             close_pipes(pipefd, pipes_num);
 
             if( execvp(cmd_list[final_cmd_pos][0],

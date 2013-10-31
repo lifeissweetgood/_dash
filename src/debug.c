@@ -67,21 +67,24 @@ void printErrorMessage(char** args, int code)
 }
 
 /*
- * Displays error message for general failed call.
+ * Displays error message to stderr (useful for piped calls).
  *
  */
-void printStrErrorMessage(char* msg, int code)
+void printStdErrMessage(const char *func, int line, const char* msg, int code)
 {
     switch(code) {
         case EACCES:
-            printf("Permission DENIED: %s\n", msg);
+            fprintf(stderr, "Permission DENIED: %s\n", msg);
             break;
         case ENOENT:
-            printf("Command not found: %s\n", msg);
+            fprintf(stderr, "Command not found: %s\n", msg);
             break;
         default:
-            printf("Something bad happened. Error code %d\n", code);
-            printf("%s\n", msg);
+            fprintf(stderr,
+                    "Something bad happened. Error code %d\n",
+                    code);
     }
+    fprintf(stderr, "%s %d: %s errno: %d\n",
+            func, line, msg, errno);
 }
 
