@@ -24,7 +24,6 @@ int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
     int cpid1, cpid2, cpid3;
 
     cmd_list_len = three_d_array_len(cmd_list);
-    printf("%s %d: Cmd_list length = %d\n", __func__, __LINE__, cmd_list_len); 
 
     // Need at least 1 command.
     if( cmd_list[0] == NULL ) return -1;

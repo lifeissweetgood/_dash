@@ -135,9 +135,9 @@ int main(int argc, char* argv[])
         // TODO: Sanitize user input! We're currently hoping the user is a
         // benelovent, sweet human being. HA!
 
-        // HACK: Multiply the amount of space allocated to give malloc some room to
-        // write overhead in subsequent calls and not overwrite memory in this
-        // guy like he was doing. Silly malloc.
+        // HACK: Multiply the amount of space allocated to give malloc some room
+        // to write overhead in subsequent calls and not overwrite memory in
+        // this guy like he was doing. Silly malloc.
         if( (formattedInput = malloc(sizeof(userInput)*10)) == NULL )
             ERROR("Failed malloc\n");
         removeNewLine(userInput, formattedInput);
@@ -163,19 +163,12 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        printf("%d: formatted string: %s\n", __LINE__, formattedInput);
-
         parseUserInput(formattedInput, cmdargv);
-        printf("%s %d: Showing command\n",__func__, __LINE__);
-        show_cmd(cmdargv);
         cmds_to_be_run = parse_commands(cmdargv);
         // TODO: check for error
-        printStdErrMessage(__func__, __LINE__, "3d array", 0); 
-        three_d_array_len(cmds_to_be_run);
 
         // Need to make sure this never goes over MAX_NUM_PIPES
         pipes_num = num_pipes(cmdargv);
-        printf("%s %d: num pipes = %d\n", __func__, __LINE__, pipes_num);
         for(i=0; i < (pipes_num * 2); i++) {
             piperet = pipe(pipefd + (i * 2));
             if (piperet == -1) {
@@ -184,28 +177,16 @@ int main(int argc, char* argv[])
             }
         }
 
-        //if((cmds_to_be_run[1] == NULL) ||
-        //   (cmds_to_be_run[1][0] == NULL)) {
         if(pipes_num == 0) {
-            //printf("caller: The *only* command is:\n");
-            //show_cmd(cmds_to_be_run[0]);
-            
-            /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0], NULL);*/
             rc = run_pipe(pipefd, 0, cmds_to_be_run);
             if(rc == -1)
                 printf("No commands passed to run_pipe\n");
         } else {
-            /* ORIG: rc = run_pipe(pipefd, cmds_to_be_run[0],
-             *                     cmds_to_be_run[1]); */
-            printStdErrMessage(__func__, __LINE__, "3d array", 0); 
-        three_d_array_len(cmds_to_be_run);
             rc = run_pipe(pipefd, pipes_num, cmds_to_be_run);
             if(rc == -1)
                 printf("No commands passed to run_pipe\n");
             //ASSERT( rc == 0 );
             
-            //close(pipefd[0]);
-            //close(pipefd[1]);
             for(i=0; i < pipes_num; i++)
                 close(pipefd[i]);
         }
@@ -214,19 +195,14 @@ int main(int argc, char* argv[])
             //fprintf(stderr, "process %d exits with %d\n", pid, WEXITSTATUS(status));
         }
 
-        //printf("%s %d: About to show commands to be run\n",
-        //       __func__, __LINE__);
-        //if(cmds_to_be_run)
-        //    show_cmd_list(cmds_to_be_run);
-
         // Free triple star list
         //free(cmds_to_be_run);
 
         // Free list of command strings
         if (cmdargv) {
-            for (i = 0; i < MAX_CMD_ARGS; i++) {
+            //for (i = 0; i < MAX_CMD_ARGS; i++) {
                 //free(cmdargv[i]); /* free(NULL) is ok with glibc */
-            }
+            //}
         }
         //free(cmdargv);
     }
