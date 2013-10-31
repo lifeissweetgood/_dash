@@ -19,8 +19,8 @@ void close_pipes(int pipefd[], int num_pipes)
 
 int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
 {
-    int /*fd_counter, cmd_counter,*/ cmd_list_len, pipe_fd_total,
-        final_cmd_pos;
+    int fd_cntr, cmd_cntr, cmd_list_len,
+        pipe_fd_total, final_cmd_pos;
     int cpid1, cpid2, cpid3;
 
     cmd_list_len = three_d_array_len(cmd_list);
@@ -63,25 +63,35 @@ int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
         // If cmd_list > 2, then multiple pipes are in order.
         if(cmd_list_len > 2)
         {
-            cpid2 = fork();
-            if(cpid2 == 0)
+            fd_cntr = 0;
+            cmd_cntr = 1;
+            while(cmd_cntr < (cmd_list_len - 1))
             {
-                printf("Child 2 launched with command %s\n", cmd_list[1][0]);
-                if(dup2(pipefd[0], STDIN_FILENO) < 0)
-                    printStdErrMessage(__func__, __LINE__,
-                                       "CHILD 2: Dup STDIN failed!", errno);
-                if(dup2(pipefd[3], STDOUT_FILENO) < 0)
-                    printStdErrMessage(__func__, __LINE__,
-                                       "CHILD 2: Dup STDOUT failed!", errno);
-                close_pipes(pipefd, pipes_num);
+                cpid2 = fork();
+                if(cpid2 == 0)
+                {
+                    printf("Child 2 launched with command %s\n",
+                           cmd_list[cmd_cntr][0]);
+                    if(dup2(pipefd[fd_cntr], STDIN_FILENO) < 0)
+                        printStdErrMessage(__func__, __LINE__,
+                                        "CHILD 2: Dup STDIN failed!", errno);
+                    if(dup2(pipefd[fd_cntr+3], STDOUT_FILENO) < 0)
+                        printStdErrMessage(__func__, __LINE__,
+                                        "CHILD 2: Dup STDOUT failed!", errno);
+                    close_pipes(pipefd, pipes_num);
 
-                if( execvp(cmd_list[1][0], cmd_list[1]) < 0)
-                    printErrorMessage(cmd_list[1], errno);
-                _exit(EXIT_SUCCESS);  
+                    if( execvp(cmd_list[cmd_cntr][0], cmd_list[cmd_cntr]) < 0)
+                        printErrorMessage(cmd_list[cmd_cntr], errno);
+                    _exit(EXIT_SUCCESS);  
+                }
+                // Increase command counter
+                cmd_cntr++;
+
+                // Move file descriptor position to the stdin of the next
+                // pipe in the array
+                fd_cntr += 2;
             }
-            printf("Making it here %d\n", __LINE__); 
         }
-        printf("Making it here %d\n", __LINE__); 
         
         // Last child, executed regardless of num of pipes
         cpid3 = fork();
