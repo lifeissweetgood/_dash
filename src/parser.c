@@ -114,7 +114,7 @@ char ***parse_commands(char **userInputStr)
     // Allocate enough space to accomodate the number of commands that need to
     // be run
     cmdlen = sizeof(char*) * (pipes + 1);
-    if( (cmds_to_be_run = malloc(cmdlen)) == NULL)
+    if( (cmds_to_be_run = malloc(cmdlen*2)) == NULL)
         ERROR("Malloc cmds_to_be_run failed!");
     memset(cmds_to_be_run, '\0', cmdlen);
 
@@ -139,6 +139,7 @@ char ***parse_commands(char **userInputStr)
 
         // Now add command to cmds_to_be_run
         cmds_to_be_run[0] = command;
+        cmds_to_be_run[1] = NULL;
     }
     else    // Multiple commands with pipes
     {
@@ -176,6 +177,7 @@ char ***parse_commands(char **userInputStr)
                 command_parts += 1;
             }
         }
+        cmds_to_be_run[cmdi] = NULL;
         //show_cmd_list(cmds_to_be_run);
         //printf("%s %d\n",__func__, __LINE__);
     }

@@ -66,6 +66,8 @@ int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
             cmd_cntr = 1;
             while(cmd_cntr < (cmd_list_len - 1))
             {
+                //printf("%s %d: cmd_cntr = %d, cmd_list_len = %d\n",
+                //       __func__, __LINE__, cmd_cntr, cmd_list_len);
                 cpid2 = fork();
                 if(cpid2 == 0)
                 {
