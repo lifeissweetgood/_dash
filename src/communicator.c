@@ -71,8 +71,8 @@ int run_pipe(int pipefd[], int pipes_num, char ***cmd_list)
                 cpid2 = fork();
                 if(cpid2 == 0)
                 {
-                    printf("Child 2 launched with command %s\n",
-                           cmd_list[cmd_cntr][0]);
+                    printf("Child %d launched with command %s\n",
+                           cmd_cntr + 1, cmd_list[cmd_cntr][0]);
                     if(dup2(pipefd[fd_cntr], STDIN_FILENO) < 0)
                         printStdErrMessage(__func__, __LINE__,
                                         "CHILD 2: Dup STDIN failed!", errno);
