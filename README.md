@@ -1,6 +1,8 @@
 _dash
 ======
-###A shell written in C
+###A C shell!
+
+_dash is a command-line shell implemented in C.  Current functionality includes parsing of user input and piping any number of commands.  Future plans: add unit tests, implement I/O redirection
 
 ##To Compile
 $ make
